@@ -9,6 +9,7 @@ require "sqlite3"
 
 require "./util"
 
+GITHUB_APP_NAME      = ENV["GITHUB_APP_NAME"]
 GITHUB_APP_ID        = ENV["GITHUB_APP_ID"]
 GITHUB_CLIENT_ID     = ENV["GITHUB_CLIENT_ID"]
 GITHUB_CLIENT_SECRET = ENV["GITHUB_CLIENT_SECRET"]
@@ -186,9 +187,11 @@ module RepoTokens
 end
 
 class AuthController < ART::Controller
+  RECONFIGURE_URL = "https://github.com/apps/#{GITHUB_APP_NAME}/installations/new"
+
   @[ART::QueryParam("code")]
   @[ART::Get("/auth")]
-  def do_auth(code : String? = nil) : ART::RedirectResponse?
+  def do_auth(code : String? = nil) : ART::Response
     if !code
       return ART::RedirectResponse.new("https://github.com/login/oauth/authorize?client_id=#{GITHUB_CLIENT_ID}")
     end
@@ -197,16 +200,33 @@ class AuthController < ART::Controller
       "client_id"     => GITHUB_CLIENT_ID,
       "client_secret" => GITHUB_CLIENT_SECRET,
       "code"          => code,
-    }).tap(&.raise_for_status).body
-    token = "token " + HTTP::Params.parse(resp)["access_token"]
+    }).tap(&.raise_for_status)
+    resp = HTTP::Params.parse(resp.body)
+    begin
+      token = "token " + resp["access_token"]
+    rescue e
+      if resp["error"]? == "bad_verification_code"
+        return ART::RedirectResponse.new("/auth")
+      end
+      raise e
+    end
+
+    repos = [] of {String, String}
 
     Installations.for_user(token: token) do |inst|
       Repositories.for_installation(inst.id, token: token) do |repo|
         repo_owner, _, repo_name = repo.full_name.partition("/")
         RepoTokens.write(repo_owner, repo_name, token)
+        repo = "#{repo_owner}/#{repo_name}"
+        url = "https://github.com/#{repo}"
+        repos << {repo, url}
       end
     end
-    nil
+
+    ART::Response.new(headers: HTML_HEADERS) do |io|
+      ECR.embed("head.html", io)
+      ECR.embed("dashboard.html", io)
+    end
   end
 end
 
@@ -249,18 +269,20 @@ class ArtifactsController < ART::Controller
 
   view Result do
     links = result.links
-    html_response(ECR.render("artifact.html"))
+    ART::Response.new(headers: HTML_HEADERS) do |io|
+      ECR.embed("head.html", io)
+      ECR.embed("artifact.html", io)
+    end
   end
-end
-
-def html_response(html : String)
-  ART::Response.new(html, headers: HTTP::Headers{"content-type" => MIME.from_extension(".html")})
 end
 
 class FormController < ART::Controller
   @[ART::Get("/")]
   def index : ART::Response
-    html_response(ECR.render("index.html"))
+    ART::Response.new(headers: HTML_HEADERS) do |io|
+      ECR.embed("head.html", io)
+      ECR.embed("README.html", io)
+    end
   end
 
   @[ART::Post("/")]

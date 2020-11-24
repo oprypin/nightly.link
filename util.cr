@@ -16,3 +16,5 @@ macro view(typ)
     end
   end
 end
+
+HTML_HEADERS = HTTP::Headers{"content-type" => MIME.from_extension(".html")}

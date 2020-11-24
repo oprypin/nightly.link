@@ -1,0 +1,15 @@
+<h1>nightly.link</h1>
+
+<p>You have authorized these repositories:</p>
+
+<ul>
+<% repos.each do |(title, url)| %>
+  <li><a href="<%= HTML.escape(url) %>"><%= HTML.escape(title) %></a>
+<% end %>
+</ul>
+
+<a href="<%= HTML.escape(RECONFIGURE_URL) %>" target="_blank">Change the selection</a>
+
+<form action="/auth">
+  <input type="submit" value="Refresh">
+</form>
