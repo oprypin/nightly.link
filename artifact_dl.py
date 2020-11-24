@@ -87,7 +87,6 @@ def by_artifact(user, repo, artifact_id, check_suite_id=None):
     yield flask.url_for('.by_artifact', user=user, repo=repo, artifact_id=artifact_id)
     yield flask.url_for('.by_artifact_zip', user=user, repo=repo, artifact_id=artifact_id)
 
-    resp = github(f'/repos/{user}/{repo}/actions/artifacts/{artifact_id}/zip', allow_redirects=False)
     yield get_artifact_zip(user, repo, artifact_id)
 
 app.add_url_rule('/<user>/<repo>/<artifact_id>', 'by_artifact', renderer(by_artifact))
