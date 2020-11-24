@@ -1,9 +1,12 @@
 require "http"
+
 require "cache"
 require "halite"
 require "athena"
 require "jwt"
 require "sqlite3"
+
+require "./util"
 
 GITHUB_APP_ID        = ENV["GITHUB_APP_ID"]
 GITHUB_CLIENT_ID     = ENV["GITHUB_CLIENT_ID"]
@@ -207,12 +210,7 @@ class AuthController < ART::Controller
 end
 
 class ArtifactsController < ART::Controller
-  struct Result
-    property links : Array(String)
-
-    def initialize(@links)
-    end
-  end
+  record Result, links : Array(String)
 
   @[ART::Get("/:repo_owner/:repo_name/:workflow/:branch/:artifact")]
   def by_branch(repo_owner : String, repo_name : String, workflow : String, branch : String, artifact : String) : ArtifactsController::Result
@@ -248,26 +246,16 @@ class ArtifactsController < ART::Controller
     ])
   end
 
-  @[ADI::Register]
-  struct Listener
-    include AED::EventListenerInterface
-
-    def self.subscribed_events : AED::SubscribedEvents
-      AED::SubscribedEvents{ART::Events::View => 100}
+  view Result do
+    links = result.links.join("\n") do |url|
+      %(<li><a href="#{url}">#{url}</a></li>)
     end
-
-    def call(event : ART::Events::View, dispatcher : AED::EventDispatcherInterface) : Nil
-      if (result = event.action_result.as?(Result))
-        links = result.links.join("\n") do |url|
-          %(<li><a href="#{url}">#{url}</a></li>)
-        end
-        event.response = html_response(%(
-          <p>You can access this artifact by one of the following links, in the order from least to most direct</p><ul>
-            #{links}
-          </ul>
-        ))
-      end
-    end
+    html_response(%(
+      <p>You can access this artifact by one of the following links, in the order from least to most direct</p>
+      <ul>
+        #{links}
+      </ul>
+    ))
   end
 end
 
