@@ -38,7 +38,9 @@ end
 #   pem_filename: GITHUB_PEM_FILENAME,
 # )
 
-Client = Halite::Client.new
+Client = Halite::Client.new do
+  endpoint "https://api.github.com/"
+end
 
 def get_json(t, *args, **kwargs)
   r = nil
@@ -56,7 +58,7 @@ struct Installations
   def self.for_user(*, token : String, & : Installation ->)
     get_json(
       Installations,
-      "https://api.github.com/user/installations",
+      "user/installations",
       headers: {authorization: token}
     ).installations.each do |inst|
       yield inst
@@ -82,7 +84,7 @@ struct Repositories
   def self.for_installation(installation_id : Int, *, token : String, & : Repository ->)
     get_json(
       Repositories,
-      "https://api.github.com/user/installations/#{installation_id}/repositories",
+      "user/installations/#{installation_id}/repositories",
       headers: {authorization: token}
     ).repositories.each do |repo|
       yield repo
@@ -102,7 +104,7 @@ struct WorkflowRuns
   def self.for_workflow(repo_owner : String, repo_name : String, workflow : String, branch : String, *, token : String, per_page : Int32, & : WorkflowRun ->)
     get_json(
       WorkflowRuns,
-      "https://api.github.com/repos/#{repo_owner}/#{repo_name}/actions/workflows/#{workflow}/runs",
+      "repos/#{repo_owner}/#{repo_name}/actions/workflows/#{workflow}/runs",
       params: {branch: branch, event: "push", status: "success", per_page: per_page},
       headers: {authorization: token}
     ).workflow_runs.each do |run|
@@ -124,7 +126,7 @@ struct Artifacts
   def self.for_run(repo_owner : String, repo_name : String, run_id : Int64, *, token : String, & : Artifact ->)
     get_json(
       Artifacts,
-      "https://api.github.com/repos/#{repo_owner}/#{repo_name}/actions/runs/#{run_id}/artifacts",
+      "repos/#{repo_owner}/#{repo_name}/actions/runs/#{run_id}/artifacts",
       headers: {authorization: token}
     ).artifacts.each do |run|
       yield run
@@ -139,7 +141,7 @@ struct Artifact
 
   def self.zip_by_id(repo_owner : String, repo_name : String, artifact_id : Int64, *, token : String) : String
     Client.get(
-      "https://api.github.com/repos/#{repo_owner}/#{repo_name}/actions/artifacts/#{artifact_id}/zip",
+      "repos/#{repo_owner}/#{repo_name}/actions/artifacts/#{artifact_id}/zip",
       headers: {authorization: token}
     ).tap(&.raise_for_status).headers["location"]
   end
@@ -205,7 +207,7 @@ class AuthController < ART::Controller
 end
 
 class ArtifactsController < ART::Controller
-  class Result < Athena::EventDispatcher::Event
+  struct Result
     property links : Array(String)
 
     def initialize(@links)
@@ -218,7 +220,7 @@ class ArtifactsController < ART::Controller
     workflow += ".yml" unless workflow.to_i? || workflow.ends_with?(".yml")
     WorkflowRuns.for_workflow(repo_owner, repo_name, workflow, branch, token: token, per_page: 1) do |run|
       return Result.new([
-        "/github/#{repo_owner}/#{repo_name}/#{workflow}/#{branch}",
+        "/github/#{repo_owner}/#{repo_name}/#{workflow}/#{branch}/#{artifact}",
       ] + by_run(repo_owner, repo_name, run.id, artifact, run.check_suite_url.rpartition("/").last.to_i64?).links)
     end
     raise ART::Exceptions::NotFound.new("No artifacts found for workflow and branch")
@@ -251,9 +253,7 @@ class ArtifactsController < ART::Controller
     include AED::EventListenerInterface
 
     def self.subscribed_events : AED::SubscribedEvents
-      AED::SubscribedEvents{
-        ART::Events::View => 25,
-      }
+      AED::SubscribedEvents{ART::Events::View => 100}
     end
 
     def call(event : ART::Events::View, dispatcher : AED::EventDispatcherInterface) : Nil
