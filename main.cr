@@ -183,7 +183,7 @@ end
 
 class AuthController < ART::Controller
   @[ART::QueryParam("code")]
-  @[ART::Get("/github/auth")]
+  @[ART::Get("/auth")]
   def do_auth(code : String? = nil) : ART::RedirectResponse?
     if !code
       return ART::RedirectResponse.new("https://github.com/login/oauth/authorize?client_id=#{GITHUB_CLIENT_ID}")
@@ -214,36 +214,36 @@ class ArtifactsController < ART::Controller
     end
   end
 
-  @[ART::Get("/github/:repo_owner/:repo_name/:workflow/:branch/:artifact")]
+  @[ART::Get("/:repo_owner/:repo_name/:workflow/:branch/:artifact")]
   def by_branch(repo_owner : String, repo_name : String, workflow : String, branch : String, artifact : String) : ArtifactsController::Result
     token = RepoTokens.read(repo_owner, repo_name)
     workflow += ".yml" unless workflow.to_i? || workflow.ends_with?(".yml")
     WorkflowRuns.for_workflow(repo_owner, repo_name, workflow, branch, token: token, per_page: 1) do |run|
       return Result.new([
-        "/github/#{repo_owner}/#{repo_name}/#{workflow}/#{branch}/#{artifact}",
+        "/#{repo_owner}/#{repo_name}/#{workflow}/#{branch}/#{artifact}",
       ] + by_run(repo_owner, repo_name, run.id, artifact, run.check_suite_url.rpartition("/").last.to_i64?).links)
     end
     raise ART::Exceptions::NotFound.new("No artifacts found for workflow and branch")
   end
 
-  @[ART::Get("/github/:repo_owner/:repo_name/:run_id/:artifact")]
+  @[ART::Get("/:repo_owner/:repo_name/:run_id/:artifact")]
   def by_run(repo_owner : String, repo_name : String, run_id : Int64, artifact : String, check_suite_id : Int64? = nil) : ArtifactsController::Result
     token = RepoTokens.read(repo_owner, repo_name)
     Artifacts.for_run(repo_owner, repo_name, run_id, token: token) do |art|
       if art.name == artifact
         return Result.new([
-          "/github/#{repo_owner}/#{repo_name}/#{run_id}/#{artifact}",
+          "/#{repo_owner}/#{repo_name}/#{run_id}/#{artifact}",
         ] + by_artifact(repo_owner, repo_name, art.id, check_suite_id).links)
       end
     end
     raise ART::Exceptions::NotFound.new("No artifacts found for this run")
   end
 
-  @[ART::Get("/github/:repo_owner/:repo_name/:artifact_id")]
+  @[ART::Get("/:repo_owner/:repo_name/:artifact_id")]
   def by_artifact(repo_owner : String, repo_name : String, artifact_id : Int64, check_suite_id : Int64? = nil) : ArtifactsController::Result
     token = RepoTokens.read(repo_owner, repo_name)
     Result.new([
-      "/github/#{repo_owner}/#{repo_name}/#{artifact_id}",
+      "/#{repo_owner}/#{repo_name}/#{artifact_id}",
       Artifact.zip_by_id(repo_owner, repo_name, artifact_id, token: token),
     ])
   end
@@ -276,7 +276,7 @@ def html_response(html : String)
 end
 
 class FormController < ART::Controller
-  @[ART::Get("/github")]
+  @[ART::Get("/")]
   def index : ART::Response
     html_response(%(
       <form method="POST"><ul>
@@ -289,11 +289,11 @@ class FormController < ART::Controller
     ))
   end
 
-  @[ART::Post("/github")]
+  @[ART::Post("/")]
   def to_artifact_page(request : HTTP::Request) : ART::RedirectResponse
     data = HTTP::Params.parse(request.body.not_nil!.gets_to_end)
     ART::RedirectResponse.new(
-      "/github/#{data["repo_owner"]}/#{data["repo_name"]}/#{data["workflow"]}/#{data["branch"]}/#{data["artifact"]}"
+      "/#{data["repo_owner"]}/#{data["repo_name"]}/#{data["workflow"]}/#{data["branch"]}/#{data["artifact"]}"
     )
   end
 end
