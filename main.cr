@@ -1,4 +1,5 @@
 require "http"
+require "ecr"
 
 require "cache"
 require "halite"
@@ -247,15 +248,8 @@ class ArtifactsController < ART::Controller
   end
 
   view Result do
-    links = result.links.join("\n") do |url|
-      %(<li><a href="#{url}">#{url}</a></li>)
-    end
-    html_response(%(
-      <p>You can access this artifact by one of the following links, in the order from least to most direct</p>
-      <ul>
-        #{links}
-      </ul>
-    ))
+    links = result.links
+    html_response(ECR.render("artifact.html"))
   end
 end
 
@@ -266,15 +260,7 @@ end
 class FormController < ART::Controller
   @[ART::Get("/")]
   def index : ART::Response
-    html_response(%(
-      <form method="POST"><ul>
-        <li><label>Username: <input name="repo_owner" placeholder="crystal-lang" required></label>
-        <li><label>Repository: <input name="repo_name" placeholder="crystal" required></label>
-        <li><label>Workflow: <input name="workflow" placeholder="win.yml" required></label>
-        <li><label>Branch: <input name="branch" placeholder="master" required></label>
-        <li><label>Artifact: <input name="artifact" placeholder="crystal" required></label>
-      </ul><input type="submit"></form>
-    ))
+    html_response(ECR.render("index.html"))
   end
 
   @[ART::Post("/")]

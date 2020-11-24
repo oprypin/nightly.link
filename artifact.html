@@ -1,0 +1,6 @@
+<p>You can access this artifact by one of the following links, in the order from least to most direct:</p>
+<ul>
+  <% links.each do |url| %>
+    <li><a href="<%= HTML.escape(url) %>"><%= HTML.escape(url) %></a></li>
+  <% end %>
+</ul>
