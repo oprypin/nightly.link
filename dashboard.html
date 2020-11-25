@@ -1,4 +1,4 @@
-<h1>nightly.link</h1>
+<h1><a href="/">nightly.link</a></h1>
 
 <p>You have authorized these repositories:</p>
 
@@ -8,8 +8,9 @@
 <% end %>
 </ul>
 
-<a href="<%= HTML.escape(RECONFIGURE_URL) %>" target="_blank">Change the selection</a>
-
+<form action="<%= HTML.escape(RECONFIGURE_URL) %>">
+  <input type="submit" value="Change selection">
+</form>
 <form action="/auth">
   <input type="submit" value="Refresh">
 </form>

@@ -1,6 +1,16 @@
+<h1><a href="/">nightly.link</a></h1>
+<h2><%= HTML.escape(title) %></h2>
 <p>You can access this artifact by one of the following links, in the order from least to most direct:</p>
-<ul>
-  <% links.each do |url| %>
-    <li><a href="<%= HTML.escape(url) %>"><%= HTML.escape(url) %></a></li>
-  <% end %>
-</ul>
+<table><tr>
+<% {false, true}.each do |kind| %>
+  <td>
+    <ul>
+      <% links.each do |link| %>
+        <% if link.ext == kind %>
+          <li><a href="<%= HTML.escape(link.url) %>"<% if link.ext %> _target="blank"<% end %>><%= HTML.escape(link.title || link.url) %></a></li>
+        <% end %>
+      <% end %>
+    </ul>
+  </td>
+<% end %>
+</tr></table>

@@ -44,16 +44,29 @@ end
 # )
 
 Client = Halite::Client.new do
-  endpoint "https://api.github.com/"
+  endpoint("https://api.github.com/")
+  logging(skip_request_body: true)
 end
 
-def get_json(t, *args, **kwargs)
-  r = nil
-  Client.get(*args, **kwargs) do |resp|
-    resp.raise_for_status
-    r = t.from_json(resp.body_io)
+macro get_json_list(t, url, params = NamedTuple.new, max_items = 1000, **kwargs)
+  %url : String? = {{url}}
+  %max_items : Int32 = {{max_items}}
+  %params = {per_page: %max_items}.merge({{params}})
+  n = 0
+  while %url
+    result = nil
+    Client.get(%url, params: %params, {{**kwargs}}) do |resp|
+      resp.raise_for_status
+      result = {{t}}.from_json(resp.body_io)
+      %url = resp.links.try(&.["next"]?).try(&.target)
+      %params = nil
+    end
+    result.not_nil!.{{t.id.underscore}}.each do |x|
+      yield x
+      n += 1
+    end
+    break if n > %max_items
   end
-  r.not_nil!
 end
 
 struct Installations
@@ -61,13 +74,11 @@ struct Installations
   property installations : Array(Installation)
 
   def self.for_user(*, token : String, & : Installation ->)
-    get_json(
-      Installations,
-      "user/installations",
-      headers: {authorization: token}
-    ).installations.each do |inst|
-      yield inst
-    end
+    # https://docs.github.com/en/free-pro-team@latest/rest/reference/apps#list-app-installations-accessible-to-the-user-access-token
+    get_json_list(
+      Installations, "user/installations",
+      headers: {authorization: token}, max_items: 10
+    )
   end
 end
 
@@ -87,13 +98,11 @@ struct Repositories
   property repositories : Array(Repository)
 
   def self.for_installation(installation_id : Int, *, token : String, & : Repository ->)
-    get_json(
-      Repositories,
-      "user/installations/#{installation_id}/repositories",
-      headers: {authorization: token}
-    ).repositories.each do |repo|
-      yield repo
-    end
+    # https://docs.github.com/en/free-pro-team@latest/rest/reference/apps#list-repositories-accessible-to-the-user-access-token
+    get_json_list(
+      Repositories, "user/installations/#{installation_id}/repositories",
+      headers: {authorization: token}, max_items: 200
+    )
   end
 end
 
@@ -106,15 +115,12 @@ struct WorkflowRuns
   include JSON::Serializable
   property workflow_runs : Array(WorkflowRun)
 
-  def self.for_workflow(repo_owner : String, repo_name : String, workflow : String, branch : String, *, token : String, per_page : Int32, & : WorkflowRun ->)
-    get_json(
-      WorkflowRuns,
-      "repos/#{repo_owner}/#{repo_name}/actions/workflows/#{workflow}/runs",
-      params: {branch: branch, event: "push", status: "success", per_page: per_page},
-      headers: {authorization: token}
-    ).workflow_runs.each do |run|
-      yield run
-    end
+  def self.for_workflow(repo_owner : String, repo_name : String, workflow : String, branch : String, *, token : String, max_items : Int32, & : WorkflowRun ->)
+    get_json_list(
+      WorkflowRuns, "repos/#{repo_owner}/#{repo_name}/actions/workflows/#{workflow}/runs",
+      params: {branch: branch, event: "push", status: "success"},
+      headers: {authorization: token}, max_items: max_items
+    )
   end
 end
 
@@ -129,13 +135,10 @@ struct Artifacts
   property artifacts : Array(Artifact)
 
   def self.for_run(repo_owner : String, repo_name : String, run_id : Int64, *, token : String, & : Artifact ->)
-    get_json(
-      Artifacts,
-      "repos/#{repo_owner}/#{repo_name}/actions/runs/#{run_id}/artifacts",
-      headers: {authorization: token}
-    ).artifacts.each do |run|
-      yield run
-    end
+    get_json_list(
+      Artifacts, "repos/#{repo_owner}/#{repo_name}/actions/runs/#{run_id}/artifacts",
+      headers: {authorization: token}, max_items: 100
+    )
   end
 end
 
@@ -218,8 +221,7 @@ class AuthController < ART::Controller
         repo_owner, _, repo_name = repo.full_name.partition("/")
         RepoTokens.write(repo_owner, repo_name, token)
         repo = "#{repo_owner}/#{repo_name}"
-        url = "https://github.com/#{repo}"
-        repos << {repo, url}
+        repos << {repo, "/#{repo}"}
       end
     end
 
@@ -231,44 +233,65 @@ class AuthController < ART::Controller
 end
 
 class ArtifactsController < ART::Controller
-  record Result, links : Array(String)
+  record Link, url : String, title : String? = nil, ext : Bool = false
 
-  @[ART::Get("/:repo_owner/:repo_name/:workflow/:branch/:artifact")]
-  def by_branch(repo_owner : String, repo_name : String, workflow : String, branch : String, artifact : String) : ArtifactsController::Result
-    token = RepoTokens.read(repo_owner, repo_name)
-    workflow += ".yml" unless workflow.to_i? || workflow.ends_with?(".yml")
-    WorkflowRuns.for_workflow(repo_owner, repo_name, workflow, branch, token: token, per_page: 1) do |run|
-      return Result.new([
-        "/#{repo_owner}/#{repo_name}/#{workflow}/#{branch}/#{artifact}",
-      ] + by_run(repo_owner, repo_name, run.id, artifact, run.check_suite_url.rpartition("/").last.to_i64?).links)
-    end
-    raise ART::Exceptions::NotFound.new("No artifacts found for workflow and branch")
+  struct Result
+    property links = Array(Link).new
+    property title : String = ""
   end
 
-  @[ART::Get("/:repo_owner/:repo_name/:run_id/:artifact")]
+  @[ART::Get("/:repo_owner/:repo_name/artifact/:artifact_id")]
+  def by_artifact(repo_owner : String, repo_name : String, artifact_id : Int64, check_suite_id : Int64? = nil) : ArtifactsController::Result
+    token = RepoTokens.read(repo_owner, repo_name)
+    tmp_link = Artifact.zip_by_id(repo_owner, repo_name, artifact_id, token: token)
+    result = Result.new
+    result.title = "Repository #{repo_owner}/#{repo_name} | Artifact ##{artifact_id}"
+    result.links << Link.new(tmp_link, "Ephemeral direct download link (expires in <1 minute)")
+    result.links << Link.new("/#{repo_owner}/#{repo_name}/artifact/#{artifact_id}")
+    result.links << Link.new(
+      "https://github.com/#{repo_owner}/#{repo_name}/suites/#{check_suite_id}/artifacts/#{artifact_id}",
+      "GitHub: direct download of artifact ##{artifact_id} (requires GitHub login)", ext: true
+    ) if check_suite_id
+    return result
+  end
+
+  @[ART::Get("/:repo_owner/:repo_name/run/:run_id/:artifact")]
   def by_run(repo_owner : String, repo_name : String, run_id : Int64, artifact : String, check_suite_id : Int64? = nil) : ArtifactsController::Result
     token = RepoTokens.read(repo_owner, repo_name)
     Artifacts.for_run(repo_owner, repo_name, run_id, token: token) do |art|
       if art.name == artifact
-        return Result.new([
-          "/#{repo_owner}/#{repo_name}/#{run_id}/#{artifact}",
-        ] + by_artifact(repo_owner, repo_name, art.id, check_suite_id).links)
+        result = by_artifact(repo_owner, repo_name, art.id, check_suite_id)
+        result.title = "Repository #{repo_owner}/#{repo_name} | Run ##{run_id} | Artifact #{artifact}"
+        result.links << Link.new("/#{repo_owner}/#{repo_name}/run/#{run_id}/#{artifact}")
+        result.links << Link.new(
+          "https://github.com/#{repo_owner}/#{repo_name}/actions/runs/#{run_id}",
+          "GitHub: view run ##{run_id}", ext: true
+        )
+        return result
       end
     end
     raise ART::Exceptions::NotFound.new("No artifacts found for this run")
   end
 
-  @[ART::Get("/:repo_owner/:repo_name/:artifact_id")]
-  def by_artifact(repo_owner : String, repo_name : String, artifact_id : Int64, check_suite_id : Int64? = nil) : ArtifactsController::Result
+  @[ART::Get("/:repo_owner/:repo_name/:workflow/:branch/:artifact")]
+  def by_branch(repo_owner : String, repo_name : String, workflow : String, branch : String, artifact : String) : ArtifactsController::Result
     token = RepoTokens.read(repo_owner, repo_name)
-    Result.new([
-      "/#{repo_owner}/#{repo_name}/#{artifact_id}",
-      Artifact.zip_by_id(repo_owner, repo_name, artifact_id, token: token),
-    ])
+    workflow += ".yml" unless workflow.to_i? || workflow.ends_with?(".yml")
+    WorkflowRuns.for_workflow(repo_owner, repo_name, workflow, branch, token: token, max_items: 1) do |run|
+      result = by_run(repo_owner, repo_name, run.id, artifact, run.check_suite_url.rpartition("/").last.to_i64?)
+      result.title = "Repository #{repo_owner}/#{repo_name} | Workflow #{workflow} | Branch #{branch} | Artifact #{artifact}"
+      result.links << Link.new("/#{repo_owner}/#{repo_name}/#{workflow.rchop(".yml")}/#{branch}/#{artifact}")
+      result.links << Link.new("https://github.com/#{repo_owner}/#{repo_name}/actions?" + HTTP::Params.encode({
+        query: "event:push is:success workflow:#{workflow} branch:#{branch}",
+      }), "GitHub: browse runs for workflow '#{workflow}' on branch '#{branch}'", ext: true)
+      return result
+    end
+    raise ART::Exceptions::NotFound.new("No artifacts found for workflow and branch")
   end
 
   view Result do
-    links = result.links
+    title = result.title
+    links = result.links.reverse!
     ART::Response.new(headers: HTML_HEADERS) do |io|
       ECR.embed("head.html", io)
       ECR.embed("artifact.html", io)

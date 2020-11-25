@@ -1,13 +1,14 @@
+CRYSTAL ?= crystal
 release ?=
 
 md_files = $(wildcard *.md)
 html_files := $(md_files:.md=.html)
 
 main: main.cr $(html_files) $(wildcard *.html)
-	crystal build $(if $(release),--release )$<
+	$(CRYSTAL) build $(if $(release),--release )$<
 
 render_md: render_md.cr
-	crystal build $<
+	$(CRYSTAL) build $<
 
 %.html: %.md render_md
 	./render_md $< > $@
