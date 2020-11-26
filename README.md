@@ -33,14 +33,6 @@ This GitHub application is configured to request this:
 > * **Metadata** [mandatory]: Search repositories, list collaborators, and access repository metadata.
 >     * Access: **Read-only**
 
-Interestingly, the prompt that GitHub presents to you when authorizing the service says something quite a bit scarier, don't know why they wrote it like this:
-
-> **nightly.link by [Oleh Prypin](https://github.com/oprypin) would like permission to:**
->
-> * Verify your GitHub identity (*$username*)
-> * Know which resources you can access
-> * Act on your behalf
-
 ## Privacy policy
 
 An exhaustive list of what this service stores:

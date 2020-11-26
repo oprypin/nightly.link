@@ -3,8 +3,8 @@
 <p>You have authorized these repositories:</p>
 
 <ul>
-<% repos.each do |(title, url)| %>
-  <li><a href="<%= HTML.escape(url) %>"><%= HTML.escape(title) %></a>
+<% repos.each do |(repo, url)| %>
+  <li><a href="<%= HTML.escape(url) %>"><%= HTML.escape(repo.full_name) %></a>
 <% end %>
 </ul>
 
