@@ -7,13 +7,15 @@ require "athena"
 require "jwt"
 require "sqlite3"
 
-require "./util"
+require "./athena_util"
+require "./string_util"
 
 GITHUB_APP_NAME      = ENV["GITHUB_APP_NAME"]
 GITHUB_APP_ID        = ENV["GITHUB_APP_ID"].to_i
 GITHUB_CLIENT_ID     = ENV["GITHUB_OAUTH_CLIENT_ID"]
 GITHUB_CLIENT_SECRET = ENV["GITHUB_OAUTH_CLIENT_SECRET"]
 GITHUB_PEM_FILENAME  = ENV["GITHUB_PEM_FILENAME"]
+APP_SECRET           = ENV["APP_SECRET"]
 
 alias InstallationId = Int64
 
@@ -80,9 +82,10 @@ class AppAuth
       @@token.write("#{installation_id}", tok.token)
       tok
     else
-      InstallationToken.new(@@token.fetch("#{installation_id}") do
+      tok = @@token.fetch("#{installation_id}") do
         new_token(installation_id).token
-      end)
+      end
+      InstallationToken.new(tok)
     end
   end
 
@@ -133,18 +136,20 @@ struct Installations
     )
   end
 
-  def self.for_app(token : AppToken, & : Installation ->)
+  def self.for_app(token : AppToken, since : Time? = nil, & : Installation ->)
     # https://docs.github.com/v3/apps#list-installations-for-the-authenticated-app
+
+    params = {since: since && (since + 1.millisecond).to_rfc3339(fraction_digits: 3)}
     get_json_list(
-      Array(Installation), "app/installations",
+      Array(Installation), "app/installations", params: params,
       headers: {authorization: token}, max_items: 100000
     )
   end
 end
 
-spawn do
-  Installations.for_app(AppClient.jwt) do |inst|
-    RepoInstallations.write(inst.account.login, inst.id)
+module RFC3339Converter
+  def self.from_json(value : JSON::PullParser) : Time
+    Time.parse_rfc3339(value.read_string)
   end
 end
 
@@ -152,6 +157,8 @@ struct Installation
   include JSON::Serializable
   property id : InstallationId
   property account : Account
+  @[JSON::Field(converter: RFC3339Converter)]
+  property updated_at : Time
 end
 
 struct Account
@@ -193,8 +200,8 @@ end
 struct Repository
   include JSON::Serializable
   property full_name : String
-  property private : Bool
-  property fork : Bool
+  property? private : Bool
+  property? fork : Bool
 end
 
 struct WorkflowRuns
@@ -244,26 +251,38 @@ end
 D = DB.open("sqlite3:./db.sqlite")
 D.exec(%(
   CREATE TABLE IF NOT EXISTS installations (
-    repo_owner TEXT NOT NULL, installation_id INTEGER NOT NULL,
+    repo_owner TEXT NOT NULL, installation_id INTEGER NOT NULL, public_repos TEXT NOT NULL, private_repos TEXT NOT NULL,
     UNIQUE(repo_owner)
   )
 ))
+D.exec(%(
+  CREATE TABLE IF NOT EXISTS state (
+    nul NULL, installations_checked TEXT,
+    UNIQUE(nul)
+  );
+))
 
-module RepoInstallations
-  @@cache = Cache::MemoryStore(String, InstallationId).new(expires_in: 1.day, compress: false)
-
-  def self.write(repo_owner : String, installation_id : InstallationId) : Nil
+record RepoInstallation,
+  repo_owner : String,
+  installation_id : InstallationId,
+  public_repos : DelimitedString,
+  private_repos : DelimitedString do
+  def write : Nil
     D.exec(%(
-      REPLACE INTO installations (repo_owner, installation_id) VALUES(?, ?)
-    ), repo_owner, installation_id)
-    @@cache.write("#{repo_owner}", installation_id)
+      REPLACE INTO installations (repo_owner, installation_id, public_repos, private_repos) VALUES(?, ?, ?, ?)
+    ), @repo_owner, @installation_id, @public_repos.to_s, @private_repos.to_s)
   end
 
-  def self.read(repo_owner : String) : InstallationId?
-    @@cache.fetch("#{repo_owner}") do
-      D.query_one(%(
-        SELECT installation_id FROM installations WHERE repo_owner = ? LIMIT 1
-      ), repo_owner, &.read(InstallationId))
+  def self.read(*, repo_owner : String) : RepoInstallation?
+    D.query(%(
+      SELECT installation_id, public_repos, private_repos FROM installations WHERE repo_owner = ? LIMIT 1
+    ), repo_owner) do |rs|
+      rs.each do
+        return new(
+          repo_owner, rs.read(InstallationId),
+          DelimitedString.new(rs.read(String)), DelimitedString.new(rs.read(String))
+        )
+      end
     end
   end
 
@@ -271,8 +290,42 @@ module RepoInstallations
     D.exec(%(
       DELETE FROM installations WHERE repo_owner = ?
     ), repo_owner)
-    @@cache.delete("#{repo_owner}")
   end
+
+  @@refresh_mutex = Mutex.new
+  class_property installations_checked : Time? do
+    D.query(%(SELECT MAX(installations_checked) FROM state LIMIT 1)) do |rs|
+      rs.each do
+        return rs.read(Time?)
+      end
+    end
+  end
+
+  def self.refresh : Nil
+    @@refresh_mutex.synchronize do
+      Installations.for_app(AppClient.jwt, since: self.installations_checked) do |inst|
+        # If the selection changes, the token becomes outdated, so get a new one.
+        token = AppClient.token(inst.id, new: true)
+        public_repos = DelimitedString::Builder.new
+        private_repos = DelimitedString::Builder.new
+        Repositories.for_installation(token: token) do |repo|
+          if (repo_name = repo.full_name.lchop?("#{inst.account.login}/"))
+            (repo.private? ? private_repos : public_repos) << repo_name
+          end
+        end
+        new(
+          inst.account.login, inst.id,
+          public_repos.build, private_repos.build
+        ).write
+        @@installations_checked = inst.updated_at
+      end
+      D.exec(%(REPLACE INTO state (installations_checked) VALUES(?)), @@installations_checked)
+    end
+  end
+end
+
+spawn do
+  RepoInstallation.refresh
 end
 
 struct OAuthToken
@@ -284,16 +337,23 @@ struct OAuthToken
   end
 end
 
+def inst_hash(inst : RepoInstallation, repo_name : String) : String
+  hash = OpenSSL::Digest.new("SHA256")
+  hash.update("#{inst.installation_id}\n#{inst.repo_owner}\n#{repo_name}\n#{APP_SECRET}")
+  hash.final.hexstring
+end
+
 class AuthController < ART::Controller
   RECONFIGURE_URL = "https://github.com/apps/#{GITHUB_APP_NAME}/installations/new"
+  AUTH_URL        = "https://github.com/login/oauth/authorize?" + HTTP::Params.encode({
+    client_id: GITHUB_CLIENT_ID, scope: "",
+  })
 
   @[ART::QueryParam("code")]
-  @[ART::Get("/auth")]
+  @[ART::Get("/dashboard")]
   def do_auth(code : String? = nil) : ART::Response
     if !code
-      return ART::RedirectResponse.new("https://github.com/login/oauth/authorize?" + HTTP::Params.encode({
-        client_id: GITHUB_CLIENT_ID, scope: "",
-      }))
+      return ART::RedirectResponse.new(AUTH_URL)
     end
 
     resp = Client.post("https://github.com/login/oauth/access_token", form: {
@@ -306,19 +366,14 @@ class AuthController < ART::Controller
       oauth_token = OAuthToken.new(resp["access_token"])
     rescue e
       if resp["error"]? == "bad_verification_code"
-        return ART::RedirectResponse.new("/auth")
+        return ART::RedirectResponse.new("/dashboard")
       end
       raise e
     end
 
     repo_owner = Account.for_oauth(oauth_token).login
-    repos = [] of {Repository, String}
-
-    # If the selection changes, the token becomes outdated, so get a new one.
-    token = AppClient.token(RepoInstallations.read(repo_owner), new: true)
-    Repositories.for_installation(token: token) do |repo|
-      repos << {repo, "/" + repo.full_name}
-    end
+    RepoInstallation.refresh
+    inst = RepoInstallation.read(repo_owner: repo_owner).not_nil!
 
     ART::Response.new(headers: HTML_HEADERS) do |io|
       ECR.embed("head.html", io)
@@ -337,7 +392,8 @@ class ArtifactsController < ART::Controller
 
   @[ART::Get("/:repo_owner/:repo_name/artifact/:artifact_id")]
   def by_artifact(repo_owner : String, repo_name : String, artifact_id : Int64, check_suite_id : Int64? = nil) : ArtifactsController::Result
-    token = AppClient.token(RepoInstallations.read(repo_owner))
+    inst = RepoInstallation.read(repo_owner: repo_owner).not_nil!
+    token = AppClient.token(inst.installation_id)
     tmp_link = Artifact.zip_by_id(repo_owner, repo_name, artifact_id, token: token)
     result = Result.new
     result.title = "Repository #{repo_owner}/#{repo_name} | Artifact ##{artifact_id}"
@@ -352,7 +408,8 @@ class ArtifactsController < ART::Controller
 
   @[ART::Get("/:repo_owner/:repo_name/run/:run_id/:artifact")]
   def by_run(repo_owner : String, repo_name : String, run_id : Int64, artifact : String, check_suite_id : Int64? = nil) : ArtifactsController::Result
-    token = AppClient.token(RepoInstallations.read(repo_owner))
+    inst = RepoInstallation.read(repo_owner: repo_owner).not_nil!
+    token = AppClient.token(inst.installation_id)
     Artifacts.for_run(repo_owner, repo_name, run_id, token) do |art|
       if art.name == artifact
         result = by_artifact(repo_owner, repo_name, art.id, check_suite_id)
@@ -370,16 +427,25 @@ class ArtifactsController < ART::Controller
 
   @[ART::Get("/:repo_owner/:repo_name/:workflow/:branch/:artifact")]
   def by_branch(repo_owner : String, repo_name : String, workflow : String, branch : String, artifact : String) : ArtifactsController::Result
-    token = AppClient.token(RepoInstallations.read(repo_owner))
+    inst = RepoInstallation.read(repo_owner: repo_owner).not_nil!
+    token = AppClient.token(inst.installation_id)
     workflow += ".yml" unless workflow.to_i? || workflow.ends_with?(".yml")
-    WorkflowRuns.for_workflow(repo_owner, repo_name, workflow, branch, token, max_items: 1) do |run|
-      result = by_run(repo_owner, repo_name, run.id, artifact, run.check_suite_url.rpartition("/").last.to_i64?)
-      result.title = "Repository #{repo_owner}/#{repo_name} | Workflow #{workflow} | Branch #{branch} | Artifact #{artifact}"
-      result.links << Link.new("/#{repo_owner}/#{repo_name}/#{workflow.rchop(".yml")}/#{branch}/#{artifact}")
-      result.links << Link.new("https://github.com/#{repo_owner}/#{repo_name}/actions?" + HTTP::Params.encode({
-        query: "event:push is:success workflow:#{workflow} branch:#{branch}",
-      }), "GitHub: browse runs for workflow '#{workflow}' on branch '#{branch}'", ext: true)
-      return result
+    begin
+      WorkflowRuns.for_workflow(repo_owner, repo_name, workflow, branch, token, max_items: 1) do |run|
+        result = by_run(repo_owner, repo_name, run.id, artifact, run.check_suite_url.rpartition("/").last.to_i64?)
+        result.title = "Repository #{repo_owner}/#{repo_name} | Workflow #{workflow} | Branch #{branch} | Artifact #{artifact}"
+        result.links << Link.new("/#{repo_owner}/#{repo_name}/#{workflow.rchop(".yml")}/#{branch}/#{artifact}")
+        result.links << Link.new("https://github.com/#{repo_owner}/#{repo_name}/actions?" + HTTP::Params.encode({
+          query: "event:push is:success workflow:#{workflow} branch:#{branch}",
+        }), "GitHub: browse runs for workflow '#{workflow}' on branch '#{branch}'", ext: true)
+        return result
+      end
+    rescue e : Halite::Exception::ClientError
+      if e.status_code.in?(401, 404)
+        raise ART::Exceptions::HTTPException.new(404, "#{e.message}", e)
+      else
+        raise e
+      end
     end
     raise ART::Exceptions::NotFound.new("No artifacts found for workflow and branch")
   end

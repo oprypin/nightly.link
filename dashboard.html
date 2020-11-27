@@ -3,14 +3,23 @@
 <p>You have authorized these repositories:</p>
 
 <ul>
-<% repos.each do |(repo, url)| %>
-  <li><a href="<%= HTML.escape(url) %>"><%= HTML.escape(repo.full_name) %></a>
+<% inst.private_repos.each do |repo_name| %>
+  <li><a href="<%= HTML.escape("/#{inst.repo_owner}/#{repo_name}?h=#{inst_hash(inst, repo_name)}") %>"><%= HTML.escape("#{inst.repo_owner}/#{repo_name}") %></a>
+<% end %>
+</ul>
+<ul>
+<% inst.public_repos.each do |repo_name| %>
+  <li><a href="<%= HTML.escape("/#{inst.repo_owner}/#{repo_name}") %>"><%= HTML.escape("#{inst.repo_owner}/#{repo_name}") %></a>
 <% end %>
 </ul>
 
 <form action="<%= HTML.escape(RECONFIGURE_URL) %>">
   <input type="submit" value="Change selection">
 </form>
-<form action="/auth">
+<form action="">
   <input type="submit" value="Refresh">
 </form>
+
+<script>
+  window.history.replaceState(null, "", window.location.href.split("?")[0]);
+</script>

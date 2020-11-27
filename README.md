@@ -4,7 +4,7 @@ This service lets you get a shareable link to download a build artifact from the
 
 Only an admin of a repository can make its artifacts accessible here. When authorizing, you are encouraged to limit the selection of repositories. The selection can be changed TODO
 
-<form action="/auth">
+<form action="/dashboard">
   <input type="submit" value="Authorize to add repositories">
 </form>
 
@@ -20,7 +20,7 @@ The discussion originates at [actions/upload-artifact "Artifact download URL onl
 
 Because GitHub doesn't provide any permanent and public links to an artifact, this service redirects to time-limited links that GitHub can give to the application -- only on behalf of an authenticated user that has access to the repository. So, whenever someone downloads an artifact from a repository that you had added, this service uses a token that GitHub had given when you authorized.
 
-You can revoke authorization at <https://github.com/settings/apps/authorizations>
+You can uninstall this at <https://github.com/settings/installations>
 
 ### GitHub permissions that this service requests
 
