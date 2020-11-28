@@ -37,7 +37,7 @@ This GitHub App requests these permissions:
 
 ### [nightly.link][app] as an [Authorized GitHub App][authorizations]
 
-Interestingly, the prompt that GitHub presents to you when authenticating the service says something quite a bit scarier, don't know why they wrote it like his:
+Interestingly, the prompt that GitHub presents to you when authenticating to the service says something quite a bit scarier:
 
 > **nightly.link by [Oleh Prypin](https://github.com/oprypin) would like permission to:**
 >
@@ -45,9 +45,13 @@ Interestingly, the prompt that GitHub presents to you when authenticating the se
 > * Know which resources you can access
 > * Act on your behalf
 
-This is needed to verify your identity, so it's possible to 
+In reality, this blurb is *completely generic* and will be shown for any GitHub App authorization regardless of its permissions. [This is discussed here.](https://github.community/t/why-does-this-forum-need-permission-to-act-on-my-behalf/120453)
 
-Feel free to [revoke][authorizations] this part anytime.
+Furthermore, the permissions that the app asks for are granted even if it's just "installed", without being "authorized".
+
+Verifying your identity is needed so that only you can view links to private repositories and your organizations. Other things, well, the service is not even asking for.
+
+Feel free to [revoke][authorizations] this part (but keep the [install][installations]) when you're done with this website's UI.
 
 [authorizations]: https://github.com/settings/apps/authorizations
 
@@ -56,7 +60,7 @@ Feel free to [revoke][authorizations] this part anytime.
 An exhaustive list of what this service stores:
 
 * Server-side:
-    * Full repository names that you gave access to, and a token for accessing them on your behalf.
+    * Full repository names that you gave access to.
 * Client-side: nothing.
 
 This page will be updated if that changes.

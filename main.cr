@@ -7,7 +7,6 @@ require "athena"
 require "jwt"
 require "sqlite3"
 
-require "./athena_util"
 require "./string_util"
 
 GITHUB_APP_NAME      = ENV["GITHUB_APP_NAME"]
@@ -505,7 +504,7 @@ class DashboardController < ART::Controller
       end
     rescue e : Halite::Exception::ClientError
       if e.status_code.in?(401, 404)
-        raise ART::Exceptions::NotFound.new("")
+        raise ART::Exceptions::NotFound.new("No runs found for workflow '#{workflow}' and branch '#{branch}'")
       else
         raise e
       end
@@ -519,7 +518,7 @@ class DashboardController < ART::Controller
 end
 
 class ArtifactsController < ART::Controller
-  record Link, url : String, title : String? = nil, ext : Bool = false
+  record Link, url : String, title : String? = nil, ext : Bool = false, zip : Bool = false
 
   struct Result
     property links = Array(Link).new
@@ -535,7 +534,7 @@ class ArtifactsController < ART::Controller
       WorkflowRuns.for_workflow(repo_owner, repo_name, workflow, branch, token, max_items: 1) do |run|
         result = by_run(repo_owner, repo_name, run.id, artifact, run.check_suite_url.rpartition("/").last.to_i64?, h)
         result.title = "Repository #{repo_owner}/#{repo_name} | Workflow #{workflow} | Branch #{branch} | Artifact #{artifact}"
-        result.links << Link.new("/#{repo_owner}/#{repo_name}/workflows/#{workflow.rchop(".yml")}/#{branch}/#{artifact}#{"?h=#{h}" if h}")
+        result.links << Link.new("/#{repo_owner}/#{repo_name}/workflows/#{workflow.rchop(".yml")}/#{branch}/#{artifact}#{"?h=#{h}" if h}", zip: true)
         result.links << Link.new("https://github.com/#{repo_owner}/#{repo_name}/actions?" + HTTP::Params.encode({
           query: "event:push is:success workflow:#{workflow} branch:#{branch}",
         }), "GitHub: browse runs for workflow '#{workflow}' on branch '#{branch}'", ext: true)
@@ -543,12 +542,12 @@ class ArtifactsController < ART::Controller
       end
     rescue e : Halite::Exception::ClientError
       if e.status_code.in?(401, 404)
-        raise ART::Exceptions::NotFound.new("")
+        raise ART::Exceptions::NotFound.new("No runs found for workflow '#{workflow}' and branch '#{branch}'")
       else
         raise e
       end
     end
-    raise ART::Exceptions::NotFound.new("No artifacts found for workflow and branch")
+    raise ART::Exceptions::NotFound.new("No artifacts found for workflow '#{workflow}' and branch '#{branch}'")
   end
 
   @[ART::QueryParam("h")]
@@ -559,7 +558,7 @@ class ArtifactsController < ART::Controller
       if art.name == artifact
         result = by_artifact(repo_owner, repo_name, art.id, check_suite_id, h)
         result.title = "Repository #{repo_owner}/#{repo_name} | Run ##{run_id} | Artifact #{artifact}"
-        result.links << Link.new("/#{repo_owner}/#{repo_name}/actions/runs/#{run_id}/#{artifact}#{"?h=#{h}" if h}")
+        result.links << Link.new("/#{repo_owner}/#{repo_name}/actions/runs/#{run_id}/#{artifact}#{"?h=#{h}" if h}", zip: true)
         result.links << Link.new(
           "https://github.com/#{repo_owner}/#{repo_name}/actions/runs/#{run_id}",
           "GitHub: view run ##{run_id}", ext: true
@@ -578,7 +577,7 @@ class ArtifactsController < ART::Controller
     result = Result.new
     result.title = "Repository #{repo_owner}/#{repo_name} | Artifact ##{artifact_id}"
     result.links << Link.new(tmp_link, "Ephemeral direct download link (expires in <1 minute)")
-    result.links << Link.new("/#{repo_owner}/#{repo_name}/actions/artifacts/#{artifact_id}#{"?h=#{h}" if h}")
+    result.links << Link.new("/#{repo_owner}/#{repo_name}/actions/artifacts/#{artifact_id}#{"?h=#{h}" if h}", zip: true)
     result.links << Link.new(
       "https://github.com/#{repo_owner}/#{repo_name}/suites/#{check_suite_id}/artifacts/#{artifact_id}",
       "GitHub: direct download of artifact ##{artifact_id} (requires GitHub login)", ext: true
@@ -586,14 +585,49 @@ class ArtifactsController < ART::Controller
     return result
   end
 
-  view Result do
-    title = result.title
-    links = result.links.reverse!
-    ART::Response.new(headers: HTML_HEADERS) do |io|
-      ECR.embed("head.html", io)
-      ECR.embed("artifact.html", io)
+  @[ADI::Register]
+  class ResultListener
+    include AED::EventListenerInterface
+
+    def initialize
+      @zip = false
+    end
+
+    def self.subscribed_events : AED::SubscribedEvents
+      AED::SubscribedEvents{ART::Events::View => 100, ART::Events::Request => 100, ART::Events::Response => 100}
+    end
+
+    def call(event : ART::Events::Request, dispatcher : AED::EventDispatcherInterface) : Nil
+      if (path = event.request.path.rchop?(".zip"))
+        event.request.path = path
+        @zip = true
+      end
+    end
+
+    def call(event : ART::Events::View, dispatcher : AED::EventDispatcherInterface) : Nil
+      if (result = event.action_result.as?(Result))
+        if @zip
+          event.response = ART::RedirectResponse.new(result.links.first.url)
+          @zip = false
+        else
+          title = result.title
+          links = result.links.reverse!
+          event.response = ART::Response.new(headers: HTML_HEADERS) do |io|
+            ECR.embed("head.html", io)
+            ECR.embed("artifact.html", io)
+          end
+        end
+      end
+    end
+
+    def call(event : ART::Events::Response, dispatcher : AED::EventDispatcherInterface) : Nil
+      if @zip
+        raise ART::Exceptions::NotFound.new("")
+      end
     end
   end
 end
+
+HTML_HEADERS = HTTP::Headers{"content-type" => MIME.from_extension(".html")}
 
 ART.run
