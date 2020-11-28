@@ -4,7 +4,7 @@ This service lets you get a shareable link to download a build artifact from the
 
 Any public repository is accessible by default.
 
-If you'll be publishing a link to your own repository's artifacts, please install [the GitHub App][app] anyway, so that downloads for your repositories don't share the global API rate limit. The throttling could potentially become very bad over time.
+If you'll be publishing a link to your own repository's artifacts, please install [the GitHub App][app] anyway, so that downloads for your repositories don't share the global API rate limit. The throttling will likely become very bad over time.
 
 [app]: https://github.com/apps/nightly-link
 
@@ -22,7 +22,7 @@ So, this service is a solution to this omission.
 
 ## Authorization
 
-Because GitHub doesn't provide any permanent and public links to an artifact, this service redirects to time-limited links that GitHub can give to the application -- only on behalf of an authenticated user that has access to the repository. So, whenever someone downloads an artifact from a repository that you had added, this service uses a token that GitHub had given when you authorized.
+Because GitHub doesn't provide any permanent and public links to an artifact, this service redirects to time-limited links that GitHub can give to the application -- only on behalf of an authenticated user that has access to the repository. So, whenever someone downloads an artifact from a repository that you had added, this service uses a token that is associated with your installation of the GitHub App.
 
 ### [nightly.link][app] as an [Installed GitHub App][installations]
 

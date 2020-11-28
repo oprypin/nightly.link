@@ -16,6 +16,7 @@ GITHUB_CLIENT_ID     = ENV["GITHUB_CLIENT_ID"]
 GITHUB_CLIENT_SECRET = ENV["GITHUB_CLIENT_SECRET"]
 GITHUB_PEM_FILENAME  = ENV["GITHUB_PEM_FILENAME"]
 APP_SECRET           = ENV["APP_SECRET"]
+FALLBACK_INSTALL_ID  = ENV["FALLBACK_INSTALLATION_ID"].to_i64
 
 alias InstallationId = Int64
 
@@ -354,13 +355,22 @@ record RepoInstallation,
     hash.final.hexstring[...40]
   end
 
-  def verify(repo_name : String, h : String?) : String?
+  def verify(*, repo_name : String, h : String?) : String?
     result = nil
     unless public_repos.includes?(repo_name) ||
            h && private_repos.includes?(repo_name) && h == (result = password(repo_name))
       raise ART::Exceptions::NotFound.new("Not found: #{repo_owner}/#{repo_name}")
     end
     result
+  end
+
+  def self.token(repo_owner : String, repo_name : String, *, h : String?) : InstallationToken
+    if (inst = RepoInstallation.read(repo_owner: repo_owner))
+      h = inst.verify(repo_name: repo_name, h: h)
+      AppClient.token(inst.installation_id)
+    else
+      AppClient.token(FALLBACK_INSTALL_ID)
+    end
   end
 end
 
@@ -484,9 +494,7 @@ class DashboardController < ART::Controller
   @[ART::QueryParam("h")]
   @[ART::Get("/:repo_owner/:repo_name/workflows/:workflow/:branch")]
   def by_branch(repo_owner : String, repo_name : String, workflow : String, branch : String, h : String?) : ART::Response
-    inst = RepoInstallation.read(repo_owner: repo_owner).not_nil!
-    h = inst.verify(repo_name, h)
-    token = AppClient.token(inst.installation_id)
+    token = RepoInstallation.token(repo_owner, repo_name, h: h)
     workflow += ".yml" unless workflow.to_i? || workflow.ends_with?(".yml")
     links = [] of Link
     begin
@@ -521,9 +529,7 @@ class ArtifactsController < ART::Controller
   @[ART::QueryParam("h")]
   @[ART::Get("/:repo_owner/:repo_name/workflows/:workflow/:branch/:artifact")]
   def by_branch(repo_owner : String, repo_name : String, workflow : String, branch : String, artifact : String, h : String?) : ArtifactsController::Result
-    inst = RepoInstallation.read(repo_owner: repo_owner).not_nil!
-    h = inst.verify(repo_name, h)
-    token = AppClient.token(inst.installation_id)
+    token = RepoInstallation.token(repo_owner, repo_name, h: h)
     workflow += ".yml" unless workflow.to_i? || workflow.ends_with?(".yml")
     begin
       WorkflowRuns.for_workflow(repo_owner, repo_name, workflow, branch, token, max_items: 1) do |run|
@@ -548,9 +554,7 @@ class ArtifactsController < ART::Controller
   @[ART::QueryParam("h")]
   @[ART::Get("/:repo_owner/:repo_name/actions/runs/:run_id/:artifact")]
   def by_run(repo_owner : String, repo_name : String, run_id : Int64, artifact : String, check_suite_id : Int64?, h : String?) : ArtifactsController::Result
-    inst = RepoInstallation.read(repo_owner: repo_owner).not_nil!
-    h = inst.verify(repo_name, h)
-    token = AppClient.token(inst.installation_id)
+    token = RepoInstallation.token(repo_owner, repo_name, h: h)
     Artifacts.for_run(repo_owner, repo_name, run_id, token) do |art|
       if art.name == artifact
         result = by_artifact(repo_owner, repo_name, art.id, check_suite_id, h)
@@ -569,9 +573,7 @@ class ArtifactsController < ART::Controller
   @[ART::QueryParam("h")]
   @[ART::Get("/:repo_owner/:repo_name/actions/artifacts/:artifact_id")]
   def by_artifact(repo_owner : String, repo_name : String, artifact_id : Int64, check_suite_id : Int64?, h : String?) : ArtifactsController::Result
-    inst = RepoInstallation.read(repo_owner: repo_owner).not_nil!
-    h = inst.verify(repo_name, h)
-    token = AppClient.token(inst.installation_id)
+    token = RepoInstallation.token(repo_owner, repo_name, h: h)
     tmp_link = Artifact.zip_by_id(repo_owner, repo_name, artifact_id, token: token)
     result = Result.new
     result.title = "Repository #{repo_owner}/#{repo_name} | Artifact ##{artifact_id}"
