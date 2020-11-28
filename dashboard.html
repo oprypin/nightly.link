@@ -1,21 +1,34 @@
+<title>nightly.link | Dashboard</title>
+
 <h1><a href="/">nightly.link</a></h1>
 
-<p>You have authorized these repositories:</p>
+<p>You have allowed downloads from these repositories:</p>
 
-<ul>
-<% inst.private_repos.each do |repo_name| %>
-  <li><a href="<%= HTML.escape("/#{inst.repo_owner}/#{repo_name}?h=#{inst_hash(inst, repo_name)}") %>"><%= HTML.escape("#{inst.repo_owner}/#{repo_name}") %></a>
+<% {true, false}.each do |priv| %>
+  <h2><% if priv %>Private<% else %>Public<% end %></h2>
+
+  <ul>
+  <% installations.each do |inst| %>
+    <% (priv ? inst.private_repos : inst.public_repos).each do |repo_name| %>
+      <% repo = "#{inst.repo_owner}/#{repo_name}" %>
+      <li>
+        <a href="https://github.com/<%= HTML.escape(repo) %>" target="_blank"><%= HTML.escape(repo) %></a>
+        <form action="/" method="POST">
+          <label>Insert the GitHub URL of a workflow file that uses <code>upload-artifact</code>:<br/>
+          <input name="url" required pattern="<%= HTML.escape(workflow_pattern(repo).source) %>" placeholder="<%= HTML.escape(workflow_placeholder(repo)) %>" style="width: 80%"></label>
+          <input type="submit" value="Get links">
+          <% if priv %><input type="hidden" name="h" value="<%= inst.password(repo_name) %>"><% end %>
+        </form>
+      </li>
+    <% end %>
+  <% end %>
+  </ul>
 <% end %>
-</ul>
-<ul>
-<% inst.public_repos.each do |repo_name| %>
-  <li><a href="<%= HTML.escape("/#{inst.repo_owner}/#{repo_name}") %>"><%= HTML.escape("#{inst.repo_owner}/#{repo_name}") %></a>
-<% end %>
-</ul>
 
 <form action="<%= HTML.escape(RECONFIGURE_URL) %>">
   <input type="submit" value="Change selection">
 </form>
+
 <form action="">
   <input type="submit" value="Refresh">
 </form>

@@ -1,0 +1,22 @@
+<form action="<%= HTML.escape(RECONFIGURE_URL) %>">
+  <input type="submit" value="Install and select your repositories">
+</form>
+
+<form action="/dashboard">
+  <input type="submit" value="Authorize to see your repositories">
+  (optional, other than for private repos; feel free to <a href="https://github.com/settings/apps/authorizations" target="_blank">revoke</a> this anytime)
+</form>
+
+<h2>Get a link to a repository's artifacts</h2>
+
+<form action="/" method="POST">
+  <label>Insert the GitHub URL of a workflow file that uses <code>upload-artifact</code>:<br/>
+  <input name="url" required pattern="<%= HTML.escape(workflow_pattern.source) %>" placeholder="<%= HTML.escape(workflow_placeholder) %>" <% if url %>value="<%= HTML.escape(url.not_nil!) %>"<% end %> style="width: 80%"></label>
+  <input type="submit" value="Get links">
+  <% if h %><input type="hidden" name="h" value="<%= h %>"><% end %>
+  <% messages.each do |message| %>
+    <p style="color: maroon"><%= HTML.escape(message) %></p>
+  <% end %>
+  <% example = WORKFLOW_EXAMPLES.sample %>
+  <p>Example:<br><a href="<%= HTML.escape(example) %>" target="_blank"><%= HTML.escape(example) %></a></p>
+</form>

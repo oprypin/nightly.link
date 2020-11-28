@@ -1,0 +1,9 @@
+<title>nightly.link | <%= HTML.escape(title) %></title>
+<h1><a href="/">nightly.link</a></h1>
+<h2><%= HTML.escape(title) %></h2>
+<p>Choose one of the artifacts:</p>
+<ul>
+  <% links.each do |link| %>
+    <li><a href="<%= HTML.escape(link.url) %>"><%= HTML.escape(link.title) %></a></li>
+  <% end %>
+</ul>
