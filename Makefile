@@ -4,7 +4,7 @@ release ?=
 md_files = $(wildcard *.md)
 html_files := $(md_files:.md=.html)
 
-main: main.cr $(wildcard *.cr) $(html_files) $(wildcard templates/*.html)
+nightly_link: nightly_link.cr $(wildcard *.cr) $(html_files) $(wildcard templates/*.html)
 	$(CRYSTAL) build $(if $(release),--release )$<
 
 render_md: render_md.cr
@@ -15,8 +15,8 @@ render_md: render_md.cr
 
 .PHONY: clean
 clean:
-	rm -f $(html_files) render_md main
+	rm -f $(html_files) render_md nightly_link
 
 .PHONY: run
-run: main
-	./creds.sh ./main
+run: nightly_link
+	./creds.sh ./nightly_link
