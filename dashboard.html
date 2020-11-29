@@ -6,10 +6,11 @@
 
 <% {true, false}.each do |priv| %>
   <h2><% if priv %>Private<% else %>Public<% end %></h2>
-
+  <% any = false %>
   <ul>
   <% installations.each do |inst| %>
     <% (priv ? inst.private_repos : inst.public_repos).each do |repo_name| %>
+      <% any = true %>
       <% repo = "#{inst.repo_owner}/#{repo_name}" %>
       <li>
         <a href="https://github.com/<%= HTML.escape(repo) %>" target="_blank"><%= HTML.escape(repo) %></a>
@@ -23,6 +24,7 @@
     <% end %>
   <% end %>
   </ul>
+  <% if priv && any %><p>Note: if you want to change the passwords in the private links, you have to uninstall the GitHub app and install again</p><% end %>
 <% end %>
 
 <form action="<%= HTML.escape(RECONFIGURE_URL) %>">
