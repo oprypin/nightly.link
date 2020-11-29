@@ -60,8 +60,8 @@ record RepoInstallation,
     ), repo_owner)
   end
 
-  {% for tok in ["token : UserToken".id, nil] %}
-    def self.refresh(installation : Installation, {{tok if tok}}) : RepoInstallation
+  {% for tok in [true, false] %}
+    def self.refresh(installation : Installation{% if tok %}, token : UserToken{% end %}) : RepoInstallation
       public_repos = DelimitedString::Builder.new
       private_repos = DelimitedString::Builder.new
       {% if tok %}
@@ -122,9 +122,12 @@ class DashboardController < ART::Controller
     "https://github.com/quassel/quassel/blob/master/.github/workflows/main.yml",
   ]
 
-  def workflow_pattern(repo : String? = nil) : Regex
-    return %r(^https?://github.com/(#{repo})/(blob|tree|raw|blame|commits)/([^/]+)/\.github/workflows/([^/]+)\.ya?ml$) if repo
-    return %r(^https?://github.com/([^/]+/[^/]+)/(blob|tree|raw|blame|commits)/([^/]+)/\.github/workflows/([^/]+)\.ya?ml$)
+  def workflow_pattern(repo : String) : Regex
+    %r(^https?://github.com/(#{repo})/(blob|tree|raw|blame|commits)/([^/]+)/\.github/workflows/([^/]+)\.ya?ml$)
+  end
+
+  def workflow_pattern : Regex
+    %r(^https?://github.com/([^/]+/[^/]+)/(blob|tree|raw|blame|commits)/([^/]+)/\.github/workflows/([^/]+)\.ya?ml$)
   end
 
   def workflow_placeholder(repo = "$user/$repo") : String
@@ -134,7 +137,6 @@ class DashboardController < ART::Controller
   @[ART::Get("/")]
   def index : ART::Response
     messages = Tuple.new
-    toplevel = true
     url = h = nil
     ART::Response.new(headers: HTML_HEADERS) do |io|
       io << "<title>nightly.link</title>"
@@ -166,7 +168,6 @@ class DashboardController < ART::Controller
       messages.unshift("Did not detect a link to a GitHub workflow file.")
     end
 
-    toplevel = true
     ART::Response.new(headers: HTML_HEADERS) do |io|
       io << "<title>nightly.link</title>"
       ECR.embed("templates/head.html", io)
