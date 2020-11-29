@@ -2,6 +2,8 @@ require "halite"
 require "memory_cache"
 require "jwt"
 
+require "./cache_util"
+
 alias InstallationId = Int64
 
 abstract struct Token
@@ -77,7 +79,7 @@ class GitHubAppAuth
   end
 
   @@jwt = MemoryCache(Int32, AppToken).new
-  @@token = MemoryCache(InstallationId, InstallationToken).new
+  @@token = CleanedMemoryCache(InstallationId, InstallationToken).new
 end
 
 GitHub = Halite::Client.new do
@@ -166,26 +168,6 @@ struct Account
     end
     result.not_nil!
   end
-end
-
-macro cached_array(f)
-  {{f}}
-
-  {% typ = f.block_arg.restriction.inputs[0] %}
-
-  @@cache_{{f.name}} = MemoryCache({ {{*f.args.map &.restriction}} }, Array({{typ}})).new
-
-  {% for block in [true, false] %}
-    def {% if f.receiver %}{{f.receiver}}.{% end %}{{f.name}}({{*f.args}}, expires_in : Time::Span) : Array({{typ}})
-      @@cache_{{f.name}}.fetch({ {{*f.args.map &.internal_name}} }, expires_in: expires_in) do
-        Array({{typ}}).new.tap do |result|
-          {{f.name}}({{*f.args.map &.internal_name}}) do |item|
-            result << {% if block %}yield{% end %} item
-          end
-        end
-      end.last
-    end
-  {% end %}
 end
 
 struct Repositories
@@ -285,7 +267,7 @@ struct Artifact
   property id : Int64
   property name : String
 
-  @@cache_zip_by_id = MemoryCache({String, String, Int64}, String).new
+  @@cache_zip_by_id = CleanedMemoryCache({String, String, Int64}, String).new
 
   def self.zip_by_id(repo_owner : String, repo_name : String, artifact_id : Int64, token : InstallationToken | UserToken) : String
     @@cache_zip_by_id.fetch({repo_owner, repo_name, artifact_id}, expires_in: 50.seconds) do
