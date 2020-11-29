@@ -16,6 +16,7 @@ GITHUB_CLIENT_SECRET = ENV["GITHUB_CLIENT_SECRET"]
 GITHUB_PEM_FILENAME  = ENV["GITHUB_PEM_FILENAME"]
 APP_SECRET           = ENV["APP_SECRET"]
 FALLBACK_INSTALL_ID  = ENV["FALLBACK_INSTALLATION_ID"].to_i64
+PORT                 = ENV["PORT"].to_i
 
 alias InstallationId = Int64
 
@@ -639,4 +640,4 @@ end
 
 HTML_HEADERS = HTTP::Headers{"content-type" => MIME.from_extension(".html")}
 
-ART.run
+ART.run(host: "127.0.0.1", port: PORT)
