@@ -37,7 +37,7 @@ struct OAuthToken < Token
   end
 end
 
-class AppAuth
+class GitHubAppAuth
   def initialize(@app_id : Int32, @pem_filename : String)
   end
 
@@ -53,7 +53,7 @@ class AppAuth
 
   private def new_token(installation_id : InstallationId) : InstallationToken
     result = nil
-    Client.post(
+    GitHub.post(
       "/app/installations/#{installation_id}/access_tokens",
       json: {permissions: {actions: "read"}},
       headers: {authorization: jwt}
@@ -81,12 +81,7 @@ class AppAuth
   @@token = Cache::MemoryStore(String, String).new(expires_in: 9.minutes, compress: false)
 end
 
-AppClient = AppAuth.new(
-  app_id: GITHUB_APP_ID,
-  pem_filename: GITHUB_PEM_FILENAME,
-)
-
-Client = Halite::Client.new do
+GitHub = Halite::Client.new do
   endpoint("https://api.github.com/")
   logging(skip_request_body: true, skip_response_body: true)
 end
@@ -98,7 +93,7 @@ macro get_json_list(t, url, params = NamedTuple.new, max_items = 1000, **kwargs)
   n = 0
   while %url
     %result = nil
-    Client.get(%url, params: %params, {{**kwargs}}) do |resp|
+    GitHub.get(%url, params: %params, {{**kwargs}}) do |resp|
       resp.raise_for_status
       %result = {{t}}.from_json(resp.body_io)
       %url = resp.links.try(&.["next"]?).try(&.target)
@@ -127,7 +122,6 @@ struct Installations
 
   def self.for_app(token : AppToken, since : Time? = nil, & : Installation ->)
     # https://docs.github.com/v3/apps#list-installations-for-the-authenticated-app
-
     params = {since: since && (since + 1.millisecond).to_rfc3339(fraction_digits: 3)}
     get_json_list(
       Array(Installation), "app/installations", params: params,
@@ -152,7 +146,7 @@ struct Installation
   def self.for_id(id : InstallationId, token : AppToken) : Installation
     # https://docs.github.com/v3/apps#get-an-installation-for-the-authenticated-app
     result = nil
-    Client.get("app/installations/#{id}", headers: {authorization: token}) do |resp|
+    GitHub.get("app/installations/#{id}", headers: {authorization: token}) do |resp|
       resp.raise_for_status
       result = Installation.from_json(resp.body_io)
     end
@@ -167,7 +161,7 @@ struct Account
   def self.for_oauth(token : OAuthToken) : Account
     # https://docs.github.com/v3/users#get-the-authenticated-user
     result = nil
-    Client.get("user", headers: {authorization: token}) do |resp|
+    GitHub.get("user", headers: {authorization: token}) do |resp|
       resp.raise_for_status
       result = Account.from_json(resp.body_io)
     end
@@ -185,12 +179,6 @@ struct Repositories
       Repositories, "user/installations/#{installation_id}/repositories",
       headers: {authorization: token}, max_items: 300
     )
-  end
-
-  def self.for_installation(installation_id : InstallationId, token : InstallationToken? = nil, & : Repository ->)
-    for_installation(token || AppClient.token(installation_id)) do |repo|
-      yield repo
-    end
   end
 
   def self.for_installation(token : InstallationToken, & : Repository ->)
@@ -214,6 +202,7 @@ struct Workflows
   property workflows : Array(Workflow)
 
   def self.for_repo(repo_owner : String, repo_name : String, token : InstallationToken | UserToken, & : Workflow ->)
+    # https://docs.github.com/v3/actions#list-repository-workflows
     get_json_list(
       Workflows, "/repos/#{repo_owner}/#{repo_name}/actions/workflows",
       headers: {authorization: token}, max_items: 100
@@ -233,6 +222,7 @@ struct WorkflowRuns
   property workflow_runs : Array(WorkflowRun)
 
   def self.for_repo(repo_owner : String, repo_name : String, token : InstallationToken | UserToken, max_items : Int32, & : WorkflowRun ->)
+    # https://docs.github.com/v3/actions#list-workflow-runs-for-a-repository
     get_json_list(
       WorkflowRuns, "repos/#{repo_owner}/#{repo_name}/actions/runs",
       params: {event: "push", status: "success"},
@@ -241,6 +231,7 @@ struct WorkflowRuns
   end
 
   def self.for_workflow(repo_owner : String, repo_name : String, workflow : String, branch : String, token : InstallationToken | UserToken, max_items : Int32, & : WorkflowRun ->)
+    # https://docs.github.com/v3/actions#list-workflow-runs
     get_json_list(
       WorkflowRuns, "repos/#{repo_owner}/#{repo_name}/actions/workflows/#{workflow}/runs",
       params: {branch: branch, event: "push", status: "success"},
@@ -262,6 +253,7 @@ struct Artifacts
   property artifacts : Array(Artifact)
 
   def self.for_run(repo_owner : String, repo_name : String, run_id : Int64, token : InstallationToken | UserToken, & : Artifact ->)
+    # https://docs.github.com/v3/actions#list-workflow-run-artifacts
     get_json_list(
       Artifacts, "repos/#{repo_owner}/#{repo_name}/actions/runs/#{run_id}/artifacts",
       headers: {authorization: token}, max_items: 100
@@ -275,7 +267,7 @@ struct Artifact
   property name : String
 
   def self.zip_by_id(repo_owner : String, repo_name : String, artifact_id : Int64, token : InstallationToken | UserToken) : String
-    Client.get(
+    GitHub.get(
       "repos/#{repo_owner}/#{repo_name}/actions/artifacts/#{artifact_id}/zip",
       headers: {authorization: token}
     ).tap(&.raise_for_status).headers["location"]

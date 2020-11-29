@@ -18,6 +18,11 @@ APP_SECRET           = ENV["APP_SECRET"]
 FALLBACK_INSTALL_ID  = ENV["FALLBACK_INSTALLATION_ID"].to_i64
 PORT                 = ENV["PORT"].to_i
 
+GitHubApp = GitHubAppAuth.new(
+  app_id: GITHUB_APP_ID,
+  pem_filename: GITHUB_PEM_FILENAME,
+)
+
 D = DB.open("sqlite3:./db.sqlite")
 D.exec(%(
   CREATE TABLE IF NOT EXISTS installations (
@@ -56,21 +61,28 @@ record RepoInstallation,
     ), repo_owner)
   end
 
-  def self.refresh(installation : Installation, token = nil) : RepoInstallation
-    public_repos = DelimitedString::Builder.new
-    private_repos = DelimitedString::Builder.new
-    Repositories.for_installation(installation.id, token: token) do |repo|
-      if (repo_name = repo.full_name.lchop?("#{installation.account.login}/"))
-        (repo.private? ? private_repos : public_repos) << repo_name
+  {% for tok in ["token : UserToken".id, nil] %}
+    def self.refresh(installation : Installation, {{tok if tok}}) : RepoInstallation
+      public_repos = DelimitedString::Builder.new
+      private_repos = DelimitedString::Builder.new
+      {% if tok %}
+        args = {installation.id, token}
+      {% else %}
+        args = {GitHubApp.token(installation.id)}
+      {% end %}
+      Repositories.for_installation(*args) do |repo|
+        if (repo_name = repo.full_name.lchop?("#{installation.account.login}/"))
+          (repo.private? ? private_repos : public_repos) << repo_name
+        end
       end
+      inst = RepoInstallation.new(
+        installation.account.login, installation.id,
+        public_repos.build, private_repos.build
+      )
+      inst.write
+      inst
     end
-    inst = RepoInstallation.new(
-      installation.account.login, installation.id,
-      public_repos.build, private_repos.build
-    )
-    inst.write
-    inst
-  end
+  {% end %}
 
   def password(repo_name : String) : String
     hash = OpenSSL::Digest.new("SHA256")
@@ -90,9 +102,9 @@ record RepoInstallation,
   def self.verified_token(repo_owner : String, repo_name : String, *, h : String?) : {InstallationToken, String?}
     if (inst = RepoInstallation.read(repo_owner: repo_owner))
       h = inst.verify(repo_name: repo_name, h: h)
-      {AppClient.token(inst.installation_id), h}
+      {GitHubApp.token(inst.installation_id), h}
     else
-      {AppClient.token(FALLBACK_INSTALL_ID), nil}
+      {GitHubApp.token(FALLBACK_INSTALL_ID), nil}
     end
   end
 end
@@ -170,7 +182,7 @@ class DashboardController < ART::Controller
       return ART::RedirectResponse.new(AUTH_URL)
     end
 
-    resp = Client.post("https://github.com/login/oauth/access_token", form: {
+    resp = GitHub.post("https://github.com/login/oauth/access_token", form: {
       "client_id"     => GITHUB_CLIENT_ID,
       "client_secret" => GITHUB_CLIENT_SECRET,
       "code"          => code,
@@ -200,7 +212,7 @@ class DashboardController < ART::Controller
   @[ART::QueryParam("installation_id")]
   @[ART::Get("/setup")]
   def do_setup(installation_id : InstallationId) : ART::Response
-    inst = Installation.for_id(installation_id, AppClient.jwt)
+    inst = Installation.for_id(installation_id, GitHubApp.jwt)
     RepoInstallation.refresh(inst)
     ART::RedirectResponse.new("/")
   end
