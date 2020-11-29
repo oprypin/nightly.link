@@ -1,17 +1,22 @@
-<title>nightly.link | <%= HTML.escape(title) %></title>
+<title>nightly.link | <%= HTML.escape(title[0]) %> | <%= HTML.escape(title[1]) %></title>
 <h1><a href="/">nightly.link</a></h1>
-<h2><%= HTML.escape(title) %></h2>
-<p>You can access this artifact by one of the following links, in the order from least to most direct:</p>
-<table><tr>
-<% {false, true}.each do |kind| %>
-  <td>
-    <ul>
-      <% links.each do |link| %>
-        <% if link.ext == kind %>
-          <li><a href="<%= HTML.escape(link.url) %>"<% if link.ext %> _target="blank"<% end %>><%= HTML.escape(link.title || link.url) %></a></li>
-        <% end %>
+<h2><%= HTML.escape(title[0]) %></h2>
+<h3><%= HTML.escape(title[1]) %></h3>
+<% {false, true}.each do |ext| %>
+  <% if ext %>
+    <p>Pages on GitHub:</p>
+  <% else %>
+    <p>You can access this artifact by one of the following links, in the order from least to most direct:</p>
+  <% end %>
+  <ul>
+    <% links.each_with_index do |link, i| %>
+      <% if link.ext == ext %>
+        <li>
+          <a href="<%= HTML.escape(link.url) %>"<% if link.ext %> _target="blank"<% end %>><%= HTML.escape(link.title || link.url) %></a>
+          <% if i == 0 %>(this page)<% end %>
+          <% if link.zip %><br><% if i == 0 %><b><% end %><a href="<%= HTML.escape(link.url) %>.zip"><%= HTML.escape(link.url) %><% if i != 0 %><b><% end %>.zip</b></a> (direct download)<% end %>
+        </li>
       <% end %>
-    </ul>
-  </td>
+    <% end %>
+  </ul>
 <% end %>
-</tr></table>

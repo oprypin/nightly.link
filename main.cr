@@ -363,12 +363,12 @@ record RepoInstallation,
     result
   end
 
-  def self.token(repo_owner : String, repo_name : String, *, h : String?) : InstallationToken
+  def self.verified_token(repo_owner : String, repo_name : String, *, h : String?) : {InstallationToken, String?}
     if (inst = RepoInstallation.read(repo_owner: repo_owner))
       h = inst.verify(repo_name: repo_name, h: h)
-      AppClient.token(inst.installation_id)
+      {AppClient.token(inst.installation_id), h}
     else
-      AppClient.token(FALLBACK_INSTALL_ID)
+      {AppClient.token(FALLBACK_INSTALL_ID), nil}
     end
   end
 end
@@ -493,7 +493,7 @@ class DashboardController < ART::Controller
   @[ART::QueryParam("h")]
   @[ART::Get("/:repo_owner/:repo_name/workflows/:workflow/:branch")]
   def by_branch(repo_owner : String, repo_name : String, workflow : String, branch : String, h : String?) : ART::Response
-    token = RepoInstallation.token(repo_owner, repo_name, h: h)
+    token, h = RepoInstallation.verified_token(repo_owner, repo_name, h: h)
     workflow += ".yml" unless workflow.to_i? || workflow.ends_with?(".yml")
     links = [] of Link
     begin
@@ -509,7 +509,7 @@ class DashboardController < ART::Controller
         raise e
       end
     end
-    title = "Repository #{repo_owner}/#{repo_name} | Workflow #{workflow} | Branch #{branch}"
+    title = "Workflow #{workflow} | Branch #{branch}"
     return ART::Response.new(headers: HTML_HEADERS) do |io|
       ECR.embed("head.html", io)
       ECR.embed("artifact_list.html", io)
@@ -522,22 +522,25 @@ class ArtifactsController < ART::Controller
 
   struct Result
     property links = Array(Link).new
-    property title : String = ""
+    property title : {String, String} = {"", ""}
   end
 
   @[ART::QueryParam("h")]
   @[ART::Get("/:repo_owner/:repo_name/workflows/:workflow/:branch/:artifact")]
   def by_branch(repo_owner : String, repo_name : String, workflow : String, branch : String, artifact : String, h : String?) : ArtifactsController::Result
-    token = RepoInstallation.token(repo_owner, repo_name, h: h)
+    token, h = RepoInstallation.verified_token(repo_owner, repo_name, h: h)
     workflow += ".yml" unless workflow.to_i? || workflow.ends_with?(".yml")
     begin
       WorkflowRuns.for_workflow(repo_owner, repo_name, workflow, branch, token, max_items: 1) do |run|
         result = by_run(repo_owner, repo_name, run.id, artifact, run.check_suite_url.rpartition("/").last.to_i64?, h)
-        result.title = "Repository #{repo_owner}/#{repo_name} | Workflow #{workflow} | Branch #{branch} | Artifact #{artifact}"
-        result.links << Link.new("/#{repo_owner}/#{repo_name}/workflows/#{workflow.rchop(".yml")}/#{branch}/#{artifact}#{"?h=#{h}" if h}", zip: true)
+        result.title = {"Repository #{repo_owner}/#{repo_name}", "Workflow #{workflow} | Branch #{branch} | Artifact #{artifact}"}
         result.links << Link.new("https://github.com/#{repo_owner}/#{repo_name}/actions?" + HTTP::Params.encode({
           query: "event:push is:success workflow:#{workflow} branch:#{branch}",
         }), "GitHub: browse runs for workflow '#{workflow}' on branch '#{branch}'", ext: true)
+        result.links << Link.new(
+          "/#{repo_owner}/#{repo_name}/workflows/#{workflow.rchop(".yml")}/#{branch}/#{artifact}#{"?h=#{h}" if h}",
+          result.title[1], zip: true
+        )
         return result
       end
     rescue e : Halite::Exception::ClientError
@@ -553,15 +556,18 @@ class ArtifactsController < ART::Controller
   @[ART::QueryParam("h")]
   @[ART::Get("/:repo_owner/:repo_name/actions/runs/:run_id/:artifact")]
   def by_run(repo_owner : String, repo_name : String, run_id : Int64, artifact : String, check_suite_id : Int64?, h : String?) : ArtifactsController::Result
-    token = RepoInstallation.token(repo_owner, repo_name, h: h)
+    token, h = RepoInstallation.verified_token(repo_owner, repo_name, h: h)
     Artifacts.for_run(repo_owner, repo_name, run_id, token) do |art|
       if art.name == artifact
         result = by_artifact(repo_owner, repo_name, art.id, check_suite_id, h)
-        result.title = "Repository #{repo_owner}/#{repo_name} | Run ##{run_id} | Artifact #{artifact}"
-        result.links << Link.new("/#{repo_owner}/#{repo_name}/actions/runs/#{run_id}/#{artifact}#{"?h=#{h}" if h}", zip: true)
+        result.title = {"Repository #{repo_owner}/#{repo_name}", "Run ##{run_id} | Artifact #{artifact}"}
         result.links << Link.new(
           "https://github.com/#{repo_owner}/#{repo_name}/actions/runs/#{run_id}",
           "GitHub: view run ##{run_id}", ext: true
+        )
+        result.links << Link.new(
+          "/#{repo_owner}/#{repo_name}/actions/runs/#{run_id}/#{artifact}#{"?h=#{h}" if h}",
+          result.title[1], zip: true
         )
         return result
       end
@@ -572,16 +578,19 @@ class ArtifactsController < ART::Controller
   @[ART::QueryParam("h")]
   @[ART::Get("/:repo_owner/:repo_name/actions/artifacts/:artifact_id")]
   def by_artifact(repo_owner : String, repo_name : String, artifact_id : Int64, check_suite_id : Int64?, h : String?) : ArtifactsController::Result
-    token = RepoInstallation.token(repo_owner, repo_name, h: h)
+    token, h = RepoInstallation.verified_token(repo_owner, repo_name, h: h)
     tmp_link = Artifact.zip_by_id(repo_owner, repo_name, artifact_id, token: token)
     result = Result.new
-    result.title = "Repository #{repo_owner}/#{repo_name} | Artifact ##{artifact_id}"
+    result.title = {"Repository #{repo_owner}/#{repo_name}", "Artifact ##{artifact_id}"}
     result.links << Link.new(tmp_link, "Ephemeral direct download link (expires in <1 minute)")
-    result.links << Link.new("/#{repo_owner}/#{repo_name}/actions/artifacts/#{artifact_id}#{"?h=#{h}" if h}", zip: true)
     result.links << Link.new(
       "https://github.com/#{repo_owner}/#{repo_name}/suites/#{check_suite_id}/artifacts/#{artifact_id}",
       "GitHub: direct download of artifact ##{artifact_id} (requires GitHub login)", ext: true
     ) if check_suite_id
+    result.links << Link.new(
+      "/#{repo_owner}/#{repo_name}/actions/artifacts/#{artifact_id}#{"?h=#{h}" if h}",
+      result.title[1], zip: true
+    )
     return result
   end
 
