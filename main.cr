@@ -235,7 +235,7 @@ class DashboardController < ART::Controller
 end
 
 class ArtifactsController < ART::Controller
-  record Link, url : String, title : String? = nil, ext : Bool = false, zip : Bool = false
+  record Link, url : String, title : String? = nil, ext : Bool = false, zip : String? = nil
 
   struct Result
     property links = Array(Link).new
@@ -254,10 +254,8 @@ class ArtifactsController < ART::Controller
         result.links << Link.new("https://github.com/#{repo_owner}/#{repo_name}/actions?" + HTTP::Params.encode({
           query: "event:push is:success workflow:#{workflow} branch:#{branch}",
         }), "GitHub: browse runs for workflow '#{workflow}' on branch '#{branch}'", ext: true)
-        result.links << Link.new(
-          "/#{repo_owner}/#{repo_name}/workflows/#{workflow.rchop(".yml")}/#{branch}/#{artifact}#{"?h=#{h}" if h}",
-          result.title[1], zip: true
-        )
+        link = "/#{repo_owner}/#{repo_name}/workflows/#{workflow.rchop(".yml")}/#{branch}/#{artifact}"
+        result.links << Link.new("#{link}#{"?h=#{h}" if h}", result.title[1], zip: "#{link}.zip#{"?h=#{h}" if h}")
         return result
       end
     rescue e : Halite::Exception::ClientError
@@ -282,10 +280,8 @@ class ArtifactsController < ART::Controller
           "https://github.com/#{repo_owner}/#{repo_name}/actions/runs/#{run_id}",
           "GitHub: view run ##{run_id}", ext: true
         )
-        result.links << Link.new(
-          "/#{repo_owner}/#{repo_name}/actions/runs/#{run_id}/#{artifact}#{"?h=#{h}" if h}",
-          result.title[1], zip: true
-        )
+        link = "/#{repo_owner}/#{repo_name}/actions/runs/#{run_id}/#{artifact}"
+        result.links << Link.new("#{link}#{"?h=#{h}" if h}", result.title[1], zip: "#{link}.zip#{"?h=#{h}" if h}")
         return result
       end
     end
@@ -304,10 +300,8 @@ class ArtifactsController < ART::Controller
       "https://github.com/#{repo_owner}/#{repo_name}/suites/#{check_suite_id}/artifacts/#{artifact_id}",
       "GitHub: direct download of artifact ##{artifact_id} (requires GitHub login)", ext: true
     ) if check_suite_id
-    result.links << Link.new(
-      "/#{repo_owner}/#{repo_name}/actions/artifacts/#{artifact_id}#{"?h=#{h}" if h}",
-      result.title[1], zip: true
-    )
+    link = "/#{repo_owner}/#{repo_name}/actions/artifacts/#{artifact_id}"
+    result.links << Link.new("#{link}#{"?h=#{h}" if h}", result.title[1], zip: "#{link}.zip#{"?h=#{h}" if h}")
     return result
   end
 

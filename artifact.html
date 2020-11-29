@@ -14,7 +14,7 @@
         <li>
           <a href="<%= HTML.escape(link.url) %>"<% if link.ext %> _target="blank"<% end %>><%= HTML.escape(link.title || link.url) %></a>
           <% if i == 0 %>(this page)<% end %>
-          <% if link.zip %><br><% if i == 0 %><b><% end %><a href="<%= HTML.escape(link.url) %>.zip"><%= HTML.escape(link.url) %><% if i != 0 %><b><% end %>.zip</b></a> (direct download)<% end %>
+          <% if (zip = link.zip) %><br><% if i == 0 %><b><% end %><a href="<%= HTML.escape(zip) %>"><%= HTML.escape(zip) %><% if i == 0 %></b><% end %></a> (direct download)<% end %>
         </li>
       <% end %>
     <% end %>
