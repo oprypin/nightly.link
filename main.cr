@@ -197,10 +197,17 @@ class DashboardController < ART::Controller
       raise e
     end
 
-    installations = [] of RepoInstallation
-
-    Installations.for_user(token: token) do |iinst|
-      installations << RepoInstallation.refresh(iinst, token)
+    ch = Channel(RepoInstallation).new
+    installations = Array(RepoInstallation).new
+    n = 0
+    Installations.for_user(token: token) do |inst|
+      spawn do
+        ch.send(RepoInstallation.refresh(inst, token))
+      end
+      n += 1
+    end
+    n.times do
+      installations << ch.receive
     end
 
     return ART::Response.new(headers: HTML_HEADERS) do |io|
@@ -212,8 +219,10 @@ class DashboardController < ART::Controller
   @[ART::QueryParam("installation_id")]
   @[ART::Get("/setup")]
   def do_setup(installation_id : InstallationId) : ART::Response
-    inst = Installation.for_id(installation_id, GitHubApp.jwt)
-    RepoInstallation.refresh(inst)
+    spawn do
+      inst = Installation.for_id(installation_id, GitHubApp.jwt)
+      RepoInstallation.refresh(inst)
+    end
     ART::RedirectResponse.new("/")
   end
 
