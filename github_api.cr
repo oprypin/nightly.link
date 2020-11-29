@@ -1,5 +1,5 @@
 require "halite"
-require "cache"
+require "memory_cache"
 require "jwt"
 
 alias InstallationId = Int64
@@ -42,13 +42,15 @@ class GitHubAppAuth
   end
 
   def jwt : AppToken
-    AppToken.new(@@jwt.fetch("#{@app_id}") do
-      JWT.encode({
-        iat: Time.utc.to_unix,                # issued at time
-        exp: (Time.utc + 10.minutes).to_unix, # JWT expiration time (10 minute maximum)
-        iss: @app_id,                         # GitHub App's identifier
-      }, File.read(@pem_filename), JWT::Algorithm::RS256)
-    end)
+    @@jwt.fetch(@app_id, expires_in: 9.minutes) do
+      AppToken.new(
+        JWT.encode({
+          iat: Time.utc.to_unix,                # issued at time
+          exp: (Time.utc + 10.minutes).to_unix, # JWT expiration time (10 minute maximum)
+          iss: @app_id,                         # GitHub App's identifier
+        }, File.read(@pem_filename), JWT::Algorithm::RS256)
+      )
+    end.last
   end
 
   private def new_token(installation_id : InstallationId) : InstallationToken
@@ -66,19 +68,16 @@ class GitHubAppAuth
 
   def token(installation_id : InstallationId, *, new : Bool = false) : InstallationToken
     if new
-      tok = new_token(installation_id)
-      @@token.write("#{installation_id}", tok.token)
-      tok
+      @@token.write(installation_id, new_token(installation_id), expires_in: 55.minutes)
     else
-      tok = @@token.fetch("#{installation_id}") do
-        new_token(installation_id).token
-      end
-      InstallationToken.new(tok)
+      @@token.fetch(installation_id, expires_in: 55.minutes) do
+        new_token(installation_id)
+      end.last
     end
   end
 
-  @@jwt = Cache::MemoryStore(String, String).new(expires_in: 9.minutes, compress: false)
-  @@token = Cache::MemoryStore(String, String).new(expires_in: 9.minutes, compress: false)
+  @@jwt = MemoryCache(Int32, AppToken).new
+  @@token = MemoryCache(InstallationId, InstallationToken).new
 end
 
 GitHub = Halite::Client.new do
@@ -169,11 +168,31 @@ struct Account
   end
 end
 
+macro cached_array(f)
+  {{f}}
+
+  {% typ = f.block_arg.restriction.inputs[0] %}
+
+  @@cache_{{f.name}} = MemoryCache({ {{*f.args.map &.restriction}} }, Array({{typ}})).new
+
+  {% for block in [true, false] %}
+    def {% if f.receiver %}{{f.receiver}}.{% end %}{{f.name}}({{*f.args}}, expires_in : Time::Span) : Array({{typ}})
+      @@cache_{{f.name}}.fetch({ {{*f.args.map &.internal_name}} }, expires_in: expires_in) do
+        Array({{typ}}).new.tap do |result|
+          {{f.name}}({{*f.args.map &.internal_name}}) do |item|
+            result << {% if block %}yield{% end %} item
+          end
+        end
+      end.last
+    end
+  {% end %}
+end
+
 struct Repositories
   include JSON::Serializable
   property repositories : Array(Repository)
 
-  def self.for_installation(installation_id : InstallationId, token : UserToken, & : Repository ->)
+  cached_array def self.for_installation(installation_id : InstallationId, token : UserToken, & : Repository ->)
     # https://docs.github.com/v3/apps#list-repositories-accessible-to-the-user-access-token
     get_json_list(
       Repositories, "user/installations/#{installation_id}/repositories",
@@ -181,7 +200,7 @@ struct Repositories
     )
   end
 
-  def self.for_installation(token : InstallationToken, & : Repository ->)
+  cached_array def self.for_installation(token : InstallationToken, & : Repository ->)
     # https://docs.github.com/v3/apps#list-repositories-accessible-to-the-app-installation
     get_json_list(
       Repositories, "installation/repositories",
@@ -201,7 +220,7 @@ struct Workflows
   include JSON::Serializable
   property workflows : Array(Workflow)
 
-  def self.for_repo(repo_owner : String, repo_name : String, token : InstallationToken | UserToken, & : Workflow ->)
+  cached_array def self.for_repo(repo_owner : String, repo_name : String, token : InstallationToken | UserToken, & : Workflow ->)
     # https://docs.github.com/v3/actions#list-repository-workflows
     get_json_list(
       Workflows, "/repos/#{repo_owner}/#{repo_name}/actions/workflows",
@@ -221,7 +240,7 @@ struct WorkflowRuns
   include JSON::Serializable
   property workflow_runs : Array(WorkflowRun)
 
-  def self.for_repo(repo_owner : String, repo_name : String, token : InstallationToken | UserToken, max_items : Int32, & : WorkflowRun ->)
+  cached_array def self.for_repo(repo_owner : String, repo_name : String, token : InstallationToken | UserToken, max_items : Int32, & : WorkflowRun ->)
     # https://docs.github.com/v3/actions#list-workflow-runs-for-a-repository
     get_json_list(
       WorkflowRuns, "repos/#{repo_owner}/#{repo_name}/actions/runs",
@@ -230,7 +249,7 @@ struct WorkflowRuns
     )
   end
 
-  def self.for_workflow(repo_owner : String, repo_name : String, workflow : String, branch : String, token : InstallationToken | UserToken, max_items : Int32, & : WorkflowRun ->)
+  cached_array def self.for_workflow(repo_owner : String, repo_name : String, workflow : String, branch : String, token : InstallationToken | UserToken, max_items : Int32, & : WorkflowRun ->)
     # https://docs.github.com/v3/actions#list-workflow-runs
     get_json_list(
       WorkflowRuns, "repos/#{repo_owner}/#{repo_name}/actions/workflows/#{workflow}/runs",
@@ -252,7 +271,7 @@ struct Artifacts
   include JSON::Serializable
   property artifacts : Array(Artifact)
 
-  def self.for_run(repo_owner : String, repo_name : String, run_id : Int64, token : InstallationToken | UserToken, & : Artifact ->)
+  cached_array def self.for_run(repo_owner : String, repo_name : String, run_id : Int64, token : InstallationToken | UserToken, & : Artifact ->)
     # https://docs.github.com/v3/actions#list-workflow-run-artifacts
     get_json_list(
       Artifacts, "repos/#{repo_owner}/#{repo_name}/actions/runs/#{run_id}/artifacts",
@@ -266,10 +285,14 @@ struct Artifact
   property id : Int64
   property name : String
 
+  @@cache_zip_by_id = MemoryCache({String, String, Int64}, String).new
+
   def self.zip_by_id(repo_owner : String, repo_name : String, artifact_id : Int64, token : InstallationToken | UserToken) : String
-    GitHub.get(
-      "repos/#{repo_owner}/#{repo_name}/actions/artifacts/#{artifact_id}/zip",
-      headers: {authorization: token}
-    ).tap(&.raise_for_status).headers["location"]
+    @@cache_zip_by_id.fetch({repo_owner, repo_name, artifact_id}, expires_in: 50.seconds) do
+      GitHub.get(
+        "repos/#{repo_owner}/#{repo_name}/actions/artifacts/#{artifact_id}/zip",
+        headers: {authorization: token}
+      ).tap(&.raise_for_status).headers["location"]
+    end.last
   end
 end

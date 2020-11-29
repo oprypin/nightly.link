@@ -14,8 +14,8 @@ dependencies:
     github: crystal-community/jwt
   halite:
     github: icyleaf/halite
-  cache:
-    github: mamantoha/cache
+  memory_cache:
+    github: kostya/memory_cache
   sqlite3:
     github: crystal-lang/crystal-sqlite3
   markd:
