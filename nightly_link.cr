@@ -139,8 +139,8 @@ class DashboardController < ART::Controller
     messages = Tuple.new
     url = h = nil
     ART::Response.new(headers: HTML_HEADERS) do |io|
-      io << "<title>nightly.link</title>"
       ECR.embed("templates/head.html", io)
+      io << "<title>nightly.link</title>"
       ECR.embed("README.html", io)
     end
   end
@@ -169,8 +169,8 @@ class DashboardController < ART::Controller
     end
 
     ART::Response.new(headers: HTML_HEADERS) do |io|
-      io << "<title>nightly.link</title>"
       ECR.embed("templates/head.html", io)
+      io << "<title>nightly.link</title>"
       ECR.embed("README.html", io)
     end
   end
