@@ -138,7 +138,7 @@ class DashboardController < ART::Controller
     url = h = nil
     ART::Response.new(headers: HTML_HEADERS) do |io|
       io << "<title>nightly.link</title>"
-      ECR.embed("head.html", io)
+      ECR.embed("templates/head.html", io)
       ECR.embed("README.html", io)
     end
   end
@@ -169,7 +169,7 @@ class DashboardController < ART::Controller
     toplevel = true
     ART::Response.new(headers: HTML_HEADERS) do |io|
       io << "<title>nightly.link</title>"
-      ECR.embed("head.html", io)
+      ECR.embed("templates/head.html", io)
       ECR.embed("README.html", io)
     end
   end
@@ -210,8 +210,8 @@ class DashboardController < ART::Controller
     end
 
     return ART::Response.new(headers: HTML_HEADERS) do |io|
-      ECR.embed("head.html", io)
-      ECR.embed("dashboard.html", io)
+      ECR.embed("templates/head.html", io)
+      ECR.embed("templates/dashboard.html", io)
     end
   end
 
@@ -253,8 +253,8 @@ class DashboardController < ART::Controller
       Link.new("/#{repo_owner}/#{repo_name}/workflows/#{workflow.rchop(".yml")}/#{branch}/#{art.name}#{"?h=#{h}" if h}", art.name)
     end
     return ART::Response.new(headers: HTML_HEADERS) do |io|
-      ECR.embed("head.html", io)
-      ECR.embed("artifact_list.html", io)
+      ECR.embed("templates/head.html", io)
+      ECR.embed("templates/artifact_list.html", io)
     end
   end
 end
@@ -370,8 +370,8 @@ class ArtifactsController < ART::Controller
           title = result.title
           links = result.links.reverse!
           event.response = ART::Response.new(headers: HTML_HEADERS) do |io|
-            ECR.embed("head.html", io)
-            ECR.embed("artifact.html", io)
+            ECR.embed("templates/head.html", io)
+            ECR.embed("templates/artifact.html", io)
           end
         end
       end
