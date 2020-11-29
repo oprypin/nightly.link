@@ -77,6 +77,10 @@ This service is developed and run by [Oleh Prypin](http://pryp.in/).
 
 It has no affiliation with my employer.
 
+## Contact
+
+Open an issue at <https://github.com/oprypin/nightly.link/issues>
+
 ## Source code
 
 The source code is available in a Git repository at <https://github.com/oprypin/nightly.link>
