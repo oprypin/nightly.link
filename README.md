@@ -63,7 +63,9 @@ An exhaustive list of what this service stores:
     * Full repository names that you gave access to.
 * Client-side: nothing.
 
-This page will be updated if that changes.
+The server of the main instance also keeps access logs and application logs for up to 3 months.
+
+This page will be updated if this changes.
 
 ## Pricing
 
@@ -74,3 +76,17 @@ No paid features are currently planned.
 This service is developed and run by [Oleh Prypin](http://pryp.in/).
 
 It has no affiliation with my employer.
+
+## Source code
+
+The source code is available in a Git repository at <https://github.com/oprypin/nightly.link>
+
+### License
+
+Copyright (C) 2020 Oleh Prypin
+
+This program is free software: you can redistribute it and/or modify it under the terms of the GNU Affero General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
+
+This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License along with this program. If not, see <https://www.gnu.org/licenses/>.
