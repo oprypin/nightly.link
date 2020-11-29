@@ -4,7 +4,7 @@ release ?=
 md_files = $(wildcard *.md)
 html_files := $(md_files:.md=.html)
 
-main: main.cr $(wildcard *_util.cr) $(html_files) $(wildcard *.html)
+main: main.cr $(wildcard *.cr) $(html_files) $(wildcard *.html)
 	$(CRYSTAL) build $(if $(release),--release )$<
 
 render_md: render_md.cr
