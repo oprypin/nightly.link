@@ -75,7 +75,7 @@ No paid features are currently planned.
 
 This service is developed and run by [Oleh Prypin](http://pryp.in/).
 
-It has no affiliation with my employer.
+It has no affiliation with my employer. No affiliation with GitHub either.
 
 ## Contact
 
