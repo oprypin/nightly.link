@@ -291,8 +291,8 @@ class ArtifactsController < ART::Controller
     result = by_run(repo_owner, repo_name, run.id, artifact, run.check_suite_url.rpartition("/").last.to_i64?, h)
     result.title = {"Repository #{repo_owner}/#{repo_name}", "Workflow #{workflow} | Branch #{branch} | Artifact #{artifact}"}
     result.links << Link.new("https://github.com/#{repo_owner}/#{repo_name}/actions?" + HTTP::Params.encode({
-      query: "event:push is:success workflow:#{workflow} branch:#{branch}",
-    }), "GitHub: browse runs for workflow '#{workflow}' on branch '#{branch}'", ext: true)
+      query: "event:push is:success branch:#{branch}",
+    }), "GitHub: browse workflow runs on branch '#{branch}'", ext: true)
     link = "/#{repo_owner}/#{repo_name}/workflows/#{workflow.rchop(".yml")}/#{branch}/#{artifact}"
     result.links << Link.new("#{link}#{"?h=#{h}" if h}", result.title[1], zip: "#{link}.zip#{"?h=#{h}" if h}")
     return result
