@@ -1,4 +1,4 @@
-# nightly.link for GitHub
+<h1>nightly.link for GitHub <a href="https://github.com/oprypin/nightly.link"><img src="https://img.shields.io/github/stars/oprypin/nightly.link?style=social" style="float: right; height: 30px; margin-top: 10px"></a></h1>
 
 This service lets you get a shareable link to download a build artifact from the latest successful GitHub Actions build of a repository.
 
