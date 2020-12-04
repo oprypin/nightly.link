@@ -307,7 +307,7 @@ class ArtifactsController < ART::Controller
       Artifacts.for_run(repo_owner, repo_name, run_id, token, expires_in: 3.hours)
     rescue e : Halite::Exception::ClientError
       if e.status_code.in?(401, 404)
-        raise ART::Exceptions::NotFound.new("No artifacts found for run ##{run_id}'")
+        raise ART::Exceptions::NotFound.new("No artifacts found for run ##{run_id}")
       else
         raise e
       end
@@ -330,7 +330,15 @@ class ArtifactsController < ART::Controller
   @[ART::Get("/:repo_owner/:repo_name/actions/artifacts/:artifact_id")]
   def by_artifact(repo_owner : String, repo_name : String, artifact_id : Int64, check_suite_id : Int64?, h : String?) : ArtifactsController::Result
     token, h = RepoInstallation.verified_token(repo_owner, repo_name, h: h)
-    tmp_link = Artifact.zip_by_id(repo_owner, repo_name, artifact_id, token: token)
+    tmp_link = begin
+      Artifact.zip_by_id(repo_owner, repo_name, artifact_id, token: token)
+    rescue e : Halite::Exception::ClientError
+      if e.status_code.in?(401, 404)
+        raise ART::Exceptions::NotFound.new("Artifact ##{artifact_id} not found")
+      else
+        raise e
+      end
+    end
     result = Result.new
     result.title = {"Repository #{repo_owner}/#{repo_name}", "Artifact ##{artifact_id}"}
     result.links << Link.new(tmp_link, "Ephemeral direct download link (expires in <1 minute)")
