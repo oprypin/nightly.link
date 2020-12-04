@@ -52,7 +52,7 @@ class GitHubAppAuth
           iss: @app_id,                         # GitHub App's identifier
         }, File.read(@pem_filename), JWT::Algorithm::RS256)
       )
-    end.last
+    end
   end
 
   private def new_token(installation_id : InstallationId) : InstallationToken
@@ -74,7 +74,7 @@ class GitHubAppAuth
     else
       @@token.fetch(installation_id, expires_in: 55.minutes) do
         new_token(installation_id)
-      end.last
+      end
     end
   end
 
@@ -275,6 +275,6 @@ struct Artifact
         "repos/#{repo_owner}/#{repo_name}/actions/artifacts/#{artifact_id}/zip",
         headers: {authorization: token}
       ).tap(&.raise_for_status).headers["location"]
-    end.last
+    end
   end
 end

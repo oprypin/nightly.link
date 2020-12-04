@@ -1,0 +1,70 @@
+version: 2.0
+shards:
+  amber_router:
+    git: https://github.com/amberframework/amber-router.git
+    version: 0.4.2
+
+  athena:
+    git: https://github.com/athena-framework/athena.git
+    version: 0.11.0
+
+  athena-config:
+    git: https://github.com/athena-framework/config.git
+    version: 0.1.3
+
+  athena-dependency_injection:
+    git: https://github.com/athena-framework/dependency-injection.git
+    version: 0.2.2
+
+  athena-event_dispatcher:
+    git: https://github.com/athena-framework/event-dispatcher.git
+    version: 0.1.2
+
+  athena-serializer:
+    git: https://github.com/athena-framework/serializer.git
+    version: 0.2.2
+
+  athena-validator:
+    git: https://github.com/athena-framework/validator.git
+    version: 0.1.2
+
+  bindata:
+    git: https://github.com/spider-gazelle/bindata.git
+    version: 1.8.1
+
+  cron_parser:
+    git: https://github.com/kostya/cron_parser.git
+    version: 0.3.0
+
+  cron_scheduler:
+    git: https://github.com/kostya/cron_scheduler.git
+    version: 0.3.0
+
+  db:
+    git: https://github.com/crystal-lang/crystal-db.git
+    version: 0.10.0
+
+  halite:
+    git: https://github.com/icyleaf/halite.git
+    version: 0.10.6
+
+  jwt:
+    git: https://github.com/crystal-community/jwt.git
+    version: 1.4.2
+
+  markd:
+    git: https://github.com/icyleaf/markd.git
+    version: 0.2.1
+
+  memory_cache:
+    git: https://github.com/kostya/memory_cache.git
+    version: 0.4
+
+  openssl_ext:
+    git: https://github.com/stakach/openssl_ext.git
+    version: 1.2.2
+
+  sqlite3:
+    git: https://github.com/crystal-lang/crystal-sqlite3.git
+    version: 0.17.0
+

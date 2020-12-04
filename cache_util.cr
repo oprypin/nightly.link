@@ -15,7 +15,7 @@ macro cached_array(f)
             result << {% if block %}yield{% end %} item
           end
         end
-      end.last
+      end
     end
   {% end %}
 end
