@@ -65,6 +65,9 @@ class GitHubAppAuth
       resp.raise_for_status
       result = InstallationToken.from_json(resp.body_io)
     end
+    spawn do
+      puts "#{installation_id} #{RateLimits.for_token(result.not_nil!)}"
+    end
     result.not_nil!
   end
 
@@ -277,4 +280,31 @@ struct Artifact
       ).tap(&.raise_for_status).headers["location"]
     end
   end
+end
+
+struct RateLimits
+  include JSON::Serializable
+
+  property core : Rate
+
+  def self.for_token(token : Token) : RateLimits
+    result = nil
+    GitHub.get(
+      "rate_limit",
+      headers: {authorization: token}
+    ) do |resp|
+      resp.raise_for_status
+      result = RateLimits.from_json(resp.body_io, root: "resources")
+    end
+    result.not_nil!
+  end
+end
+
+struct Rate
+  include JSON::Serializable
+
+  property limit : Int32
+  property remaining : Int32
+  @[JSON::Field(converter: Time::EpochConverter)]
+  property reset : Time
 end
