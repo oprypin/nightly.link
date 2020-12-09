@@ -138,7 +138,7 @@ class DashboardController < ART::Controller
   def index : ART::Response
     messages = Tuple.new
     url = h = nil
-    ART::Response.new(headers: HTML_HEADERS) do |io|
+    ART::StreamedResponse.new(headers: HTML_HEADERS) do |io|
       ECR.embed("templates/head.html", io)
       io << "<title>nightly.link</title>"
       ECR.embed("README.html", io)
@@ -146,7 +146,7 @@ class DashboardController < ART::Controller
   end
 
   @[ART::Post("/")]
-  def index(request : HTTP::Request) : ART::Response
+  def index_form(request : HTTP::Request) : ART::Response
     if (body = request.body)
       data = HTTP::Params.parse(body.gets_to_end)
       url = data["url"]?
@@ -168,7 +168,7 @@ class DashboardController < ART::Controller
       messages.unshift("Did not detect a link to a GitHub workflow file.")
     end
 
-    ART::Response.new(headers: HTML_HEADERS) do |io|
+    ART::StreamedResponse.new(headers: HTML_HEADERS) do |io|
       ECR.embed("templates/head.html", io)
       io << "<title>nightly.link</title>"
       ECR.embed("README.html", io)
@@ -210,7 +210,7 @@ class DashboardController < ART::Controller
       installations << ch.receive
     end
 
-    return ART::Response.new(headers: HTML_HEADERS) do |io|
+    return ART::StreamedResponse.new(headers: HTML_HEADERS) do |io|
       ECR.embed("templates/head.html", io)
       ECR.embed("templates/dashboard.html", io)
     end
@@ -253,7 +253,7 @@ class DashboardController < ART::Controller
     links = artifacts.map do |art|
       Link.new("/#{repo_owner}/#{repo_name}/workflows/#{workflow.rchop(".yml")}/#{branch}/#{art.name}#{"?h=#{h}" if h}", art.name)
     end
-    return ART::Response.new(headers: HTML_HEADERS) do |io|
+    return ART::StreamedResponse.new(headers: HTML_HEADERS) do |io|
       ECR.embed("templates/head.html", io)
       ECR.embed("templates/artifact_list.html", io)
     end
@@ -378,7 +378,7 @@ class ArtifactsController < ART::Controller
         else
           title = result.title
           links = result.links.reverse!
-          event.response = ART::Response.new(headers: HTML_HEADERS) do |io|
+          event.response = ART::StreamedResponse.new(headers: HTML_HEADERS) do |io|
             ECR.embed("templates/head.html", io)
             ECR.embed("templates/artifact.html", io)
           end
