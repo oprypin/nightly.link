@@ -123,11 +123,11 @@ class DashboardController < ART::Controller
   ]
 
   def workflow_pattern(repo : String) : Regex
-    %r(^https?://github.com/(#{repo})/(blob|tree|raw|blame|commits)/([^/]+)/\.github/workflows/([^/]+)\.ya?ml$)
+    %r(^https?://github.com/(#{repo})/(blob|tree|raw|blame|commits)/([^/]+)/\.github/workflows/([^/]+\.ya?ml)$)
   end
 
   def workflow_pattern : Regex
-    %r(^https?://github.com/([^/]+/[^/]+)/(blob|tree|raw|blame|commits)/([^/]+)/\.github/workflows/([^/]+)\.ya?ml$)
+    %r(^https?://github.com/([^/]+/[^/]+)/(blob|tree|raw|blame|commits)/([^/]+)/\.github/workflows/([^/]+\.ya?ml)$)
   end
 
   def workflow_placeholder(repo = "$user/$repo") : String
@@ -160,7 +160,7 @@ class DashboardController < ART::Controller
         if branch =~ /^[0-9a-fA-F]{32,}$/
           messages.unshift("Make sure you're on a branch (such as 'master'), not a commit (which '#{$0}' seems to be).")
         else
-          link = "/#{repo}/workflows/#{workflow}/#{branch}"
+          link = "/#{repo}/workflows/#{workflow.rchop(".yml")}/#{branch}"
           link += "?h=#{h}" if h
           return ART::RedirectResponse.new(link)
         end
@@ -232,7 +232,9 @@ class DashboardController < ART::Controller
   @[ART::Get("/:repo_owner/:repo_name/workflows/:workflow/:branch")]
   def by_branch(repo_owner : String, repo_name : String, workflow : String, branch : String, h : String?) : ART::Response
     token, h = RepoInstallation.verified_token(repo_owner, repo_name, h: h)
-    workflow += ".yml" unless workflow.to_i? || workflow.ends_with?(".yml")
+    unless workflow.to_i? || workflow.ends_with?(".yml") || workflow.ends_with?(".yaml")
+      workflow += ".yml"
+    end
 
     artifacts = begin
       WorkflowRuns.for_workflow(repo_owner, repo_name, workflow, branch, token, max_items: 1, expires_in: 5.minutes).each do |run|
@@ -272,7 +274,9 @@ class ArtifactsController < ART::Controller
   @[ART::Get("/:repo_owner/:repo_name/workflows/:workflow/:branch/:artifact")]
   def by_branch(repo_owner : String, repo_name : String, workflow : String, branch : String, artifact : String, h : String?) : ArtifactsController::Result
     token, h = RepoInstallation.verified_token(repo_owner, repo_name, h: h)
-    workflow += ".yml" unless workflow.to_i? || workflow.ends_with?(".yml")
+    unless workflow.to_i? || workflow.ends_with?(".yml") || workflow.ends_with?(".yaml")
+      workflow += ".yml"
+    end
 
     runs = begin
       WorkflowRuns.for_workflow(repo_owner, repo_name, workflow, branch, token, max_items: 1, expires_in: 5.minutes)
