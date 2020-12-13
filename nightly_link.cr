@@ -93,7 +93,7 @@ record RepoInstallation,
     result = nil
     unless public_repos.includes?(repo_name) ||
            h && private_repos.includes?(repo_name) && h == (result = password(repo_name))
-      raise ART::Exceptions::NotFound.new("Not found: #{repo_owner}/#{repo_name}")
+      raise ART::Exceptions::NotFound.new("Repository not found: '#{repo_owner}/#{repo_name}'")
     end
     result
   end
@@ -235,21 +235,16 @@ class DashboardController < ART::Controller
     unless workflow.to_i? || workflow.ends_with?(".yml") || workflow.ends_with?(".yaml")
       workflow += ".yml"
     end
-    message = nil
+
+    run = get_latest_run(repo_owner, repo_name, workflow, branch, token)
+    if run.updated_at < 90.days.ago
+      message = "Warning: the latest successful run is older than 90 days, and its artifacts likely expired."
+    end
 
     artifacts = begin
-      WorkflowRuns.for_workflow(repo_owner, repo_name, workflow, branch, token, max_items: 1, expires_in: 5.minutes).each do |run|
-        if run.updated_at < 90.days.ago
-          message = "Warning: the latest successful run is older than 90 days, and its artifacts likely expired."
-        end
-        break Artifacts.for_run(repo_owner, repo_name, run.id, token, expires_in: 3.hours)
-      end
+      Artifacts.for_run(repo_owner, repo_name, run.id, token, expires_in: 3.hours)
     rescue e : Halite::Exception::ClientError
-      if e.status_code.in?(401, 404)
-        raise ART::Exceptions::NotFound.new("No runs found for workflow '#{workflow}' and branch '#{branch}'")
-      else
-        raise e
-      end
+      raise e unless e.status_code.in?(401, 404)
     end
     if !artifacts || artifacts.empty?
       raise ART::Exceptions::NotFound.new("No artifacts found for workflow '#{workflow}' and branch '#{branch}'")
@@ -264,6 +259,20 @@ class DashboardController < ART::Controller
       ECR.embed("templates/artifact_list.html", io)
     end
   end
+end
+
+private def get_latest_run(repo_owner : String, repo_name : String, workflow : String, branch : String, token : InstallationToken)
+  artifacts = begin
+    WorkflowRuns.for_workflow(repo_owner, repo_name, workflow, branch, token, max_items: 1, expires_in: 5.minutes)
+  rescue e : Halite::Exception::ClientError
+    if e.status_code.in?(401, 404)
+      raise ART::Exceptions::NotFound.new("Repository '#{repo_owner}/#{repo_name}' or workflow '#{workflow}' not found")
+    end
+    raise e
+  end
+  artifacts.find do |run|
+    run.event.in?("push", "schedule")
+  end || raise ART::Exceptions::NotFound.new("No successful runs found for workflow '#{workflow}' and branch '#{branch}'")
 end
 
 class ArtifactsController < ART::Controller
@@ -281,25 +290,12 @@ class ArtifactsController < ART::Controller
     unless workflow.to_i? || workflow.ends_with?(".yml") || workflow.ends_with?(".yaml")
       workflow += ".yml"
     end
-
-    runs = begin
-      WorkflowRuns.for_workflow(repo_owner, repo_name, workflow, branch, token, max_items: 1, expires_in: 5.minutes)
-    rescue e : Halite::Exception::ClientError
-      if e.status_code.in?(401, 404)
-        raise ART::Exceptions::NotFound.new("No runs found for workflow '#{workflow}' and branch '#{branch}'")
-      else
-        raise e
-      end
-    end
-    if runs.empty?
-      raise ART::Exceptions::NotFound.new("No artifacts found for workflow '#{workflow}' and branch '#{branch}'")
-    end
-    run = runs.first
+    run = get_latest_run(repo_owner, repo_name, workflow, branch, token)
 
     result = by_run(repo_owner, repo_name, run.id, artifact, run.check_suite_url.rpartition("/").last.to_i64?, h)
     result.title = {"Repository #{repo_owner}/#{repo_name}", "Workflow #{workflow} | Branch #{branch} | Artifact #{artifact}"}
     result.links << Link.new("https://github.com/#{repo_owner}/#{repo_name}/actions?" + HTTP::Params.encode({
-      query: "event:push is:success branch:#{branch}",
+      query: "event:#{run.event} is:success branch:#{branch}",
     }), "GitHub: browse workflow runs on branch '#{branch}'", ext: true)
     link = "/#{repo_owner}/#{repo_name}/workflows/#{workflow.rchop(".yml")}/#{branch}/#{artifact}"
     result.links << Link.new("#{link}#{"?h=#{h}" if h}", result.title[1], zip: "#{link}.zip#{"?h=#{h}" if h}")
@@ -316,9 +312,8 @@ class ArtifactsController < ART::Controller
     rescue e : Halite::Exception::ClientError
       if e.status_code.in?(401, 404)
         raise ART::Exceptions::NotFound.new("No artifacts found for run ##{run_id}")
-      else
-        raise e
       end
+      raise e
     end
     art = artifacts.find { |a| a.name == artifact }
     raise ART::Exceptions::NotFound.new("Artifact '#{artifact}' not found for run ##{run_id}") if !art
@@ -345,9 +340,8 @@ class ArtifactsController < ART::Controller
     rescue e : Halite::Exception::ClientError
       if e.status_code.in?(401, 404)
         raise ART::Exceptions::NotFound.new("Artifact ##{artifact_id} not found")
-      else
-        raise e
       end
+      raise e
     end
     result = Result.new
     result.title = {"Repository #{repo_owner}/#{repo_name}", "Artifact ##{artifact_id}"}

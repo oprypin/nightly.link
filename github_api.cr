@@ -238,7 +238,7 @@ struct WorkflowRuns
     # https://docs.github.com/v3/actions#list-workflow-runs
     get_json_list(
       WorkflowRuns, "repos/#{repo_owner}/#{repo_name}/actions/workflows/#{workflow}/runs",
-      params: {branch: branch, event: "push", status: "success"},
+      params: {branch: branch, status: "success"},
       headers: {authorization: token}, max_items: max_items
     )
   end
@@ -248,6 +248,7 @@ struct WorkflowRun
   include JSON::Serializable
   property id : Int64
   property head_branch : String
+  property event : String
   property workflow_id : Int64
   property check_suite_url : String
   @[JSON::Field(converter: RFC3339Converter)]
