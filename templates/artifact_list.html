@@ -2,6 +2,9 @@
 <h1><a href="/">nightly.link</a></h1>
 <h2><%= HTML.escape(title[0]) %></h2>
 <h3><%= HTML.escape(title[1]) %></h3>
+<% if message %>
+  <p style="color: maroon"><%= HTML.escape(message.not_nil!) %></p>
+<% end %>
 <p>Choose one of the artifacts:</p>
 <ul>
   <% links.each do |link| %>

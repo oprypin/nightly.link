@@ -250,6 +250,8 @@ struct WorkflowRun
   property head_branch : String
   property workflow_id : Int64
   property check_suite_url : String
+  @[JSON::Field(converter: RFC3339Converter)]
+  property updated_at : Time
 end
 
 struct Artifacts
@@ -265,6 +267,9 @@ struct Artifacts
   end
 end
 
+class GitHubArtifactDownloadError < Halite::ServerError
+end
+
 struct Artifact
   include JSON::Serializable
   property id : Int64
@@ -274,10 +279,16 @@ struct Artifact
 
   def self.zip_by_id(repo_owner : String, repo_name : String, artifact_id : Int64, token : InstallationToken | UserToken) : String
     @@cache_zip_by_id.fetch({repo_owner, repo_name, artifact_id}, expires_in: 50.seconds) do
-      GitHub.get(
+      # https://docs.github.com/en/free-pro-team@latest/rest/reference/actions#download-an-artifact
+      resp = GitHub.get(
         "repos/#{repo_owner}/#{repo_name}/actions/artifacts/#{artifact_id}/zip",
         headers: {authorization: token}
-      ).tap(&.raise_for_status).headers["location"]
+      )
+      if resp.status_code == 500 && resp.body.includes?("Failed to generate URL to download artifact")
+        raise GitHubArtifactDownloadError.new(status_code: resp.status_code, uri: resp.uri)
+      end
+      resp.raise_for_status
+      resp.headers["location"]
     end
   end
 end

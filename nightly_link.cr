@@ -235,9 +235,13 @@ class DashboardController < ART::Controller
     unless workflow.to_i? || workflow.ends_with?(".yml") || workflow.ends_with?(".yaml")
       workflow += ".yml"
     end
+    message = nil
 
     artifacts = begin
       WorkflowRuns.for_workflow(repo_owner, repo_name, workflow, branch, token, max_items: 1, expires_in: 5.minutes).each do |run|
+        if run.updated_at < 90.days.ago
+          message = "Warning: the latest successful run is older than 90 days, and its artifacts likely expired."
+        end
         break Artifacts.for_run(repo_owner, repo_name, run.id, token, expires_in: 3.hours)
       end
     rescue e : Halite::Exception::ClientError
@@ -336,6 +340,8 @@ class ArtifactsController < ART::Controller
     token, h = RepoInstallation.verified_token(repo_owner, repo_name, h: h)
     tmp_link = begin
       Artifact.zip_by_id(repo_owner, repo_name, artifact_id, token: token)
+    rescue e : GitHubArtifactDownloadError
+      raise ART::Exceptions::NotFound.new("GitHub produced an error for the download of artifact ##{artifact_id}. Usually this means that the artifact has expired (>90 days).")
     rescue e : Halite::Exception::ClientError
       if e.status_code.in?(401, 404)
         raise ART::Exceptions::NotFound.new("Artifact ##{artifact_id} not found")
