@@ -56,6 +56,11 @@ class GitHubAppAuth
   end
 
   private def new_token(installation_id : InstallationId) : InstallationToken
+    if (old_token = @@token.read(installation_id))
+      spawn do
+        puts "Token for ##{installation_id} had #{RateLimits.for_token(old_token.not_nil!)}"
+      end
+    end
     result = nil
     GitHub.post(
       "/app/installations/#{installation_id}/access_tokens",
@@ -64,9 +69,6 @@ class GitHubAppAuth
     ) do |resp|
       resp.raise_for_status
       result = InstallationToken.from_json(resp.body_io)
-    end
-    spawn do
-      puts "#{installation_id} #{RateLimits.for_token(result.not_nil!)}"
     end
     result.not_nil!
   end
