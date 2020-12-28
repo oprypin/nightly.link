@@ -10,7 +10,7 @@
 <h2>Get a link to a repository's artifacts</h2>
 
 <form action="/" method="POST">
-  <label>Insert the GitHub URL of a workflow file that uses <code>upload-artifact</code>:<br/>
+  <label>Insert the GitHub URL of a workflow file that uses <a href="https://github.com/actions/upload-artifact#readme">actions/upload-artifact</a>:<br/>
   <input name="url" required pattern="<%= HTML.escape(workflow_pattern.source) %>" placeholder="<%= HTML.escape(workflow_placeholder) %>" <% if url %>value="<%= HTML.escape(url.not_nil!) %>"<% end %> style="width: 80%"></label>
   <input type="submit" value="Get links">
   <% if h %><input type="hidden" name="h" value="<%= h %>"><% end %>
