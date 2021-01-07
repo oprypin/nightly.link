@@ -398,4 +398,14 @@ class ArtifactsController < ART::Controller
   end
 end
 
+class StaticController < ART::Controller
+  @[ART::Get(path: "/github-markdown.min.css")]
+  def css : ART::Response
+    ART::Response.new(
+      {{read_file("#{__DIR__}/github-markdown.min.css")}},
+      headers: HTTP::Headers{"content-type" => MIME.from_extension(".css")}
+    )
+  end
+end
+
 ART.run(host: "127.0.0.1", port: PORT)

@@ -3,8 +3,9 @@ release ?=
 
 md_files = $(wildcard *.md)
 html_files := $(md_files:.md=.html)
+vendored_files := github-markdown.min.css
 
-nightly_link: nightly_link.cr $(wildcard *.cr) $(html_files) $(wildcard templates/*.html)
+nightly_link: nightly_link.cr $(wildcard *.cr) $(html_files) $(wildcard templates/*.html) $(vendored_files)
 	$(CRYSTAL) build $(if $(release),--release )$<
 
 render_md: render_md.cr
@@ -12,6 +13,9 @@ render_md: render_md.cr
 
 %.html: %.md render_md
 	./render_md $< > $@
+
+github-markdown.min.css:
+	curl -O https://cdnjs.cloudflare.com/ajax/libs/github-markdown-css/4.0.0/github-markdown.min.css
 
 .PHONY: clean
 clean:
