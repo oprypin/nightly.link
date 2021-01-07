@@ -19,7 +19,7 @@ github-markdown.min.css:
 
 .PHONY: clean
 clean:
-	rm -f $(html_files) render_md nightly_link
+	rm -f $(html_files) $(vendored_files) render_md nightly_link
 
 .PHONY: run
 run: nightly_link
