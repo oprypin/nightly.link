@@ -2,7 +2,7 @@ version: 2.0
 shards:
   amber_router:
     git: https://github.com/amberframework/amber-router.git
-    version: 0.4.3
+    version: 0.4.4
 
   athena:
     git: https://github.com/athena-framework/athena.git
@@ -14,7 +14,7 @@ shards:
 
   athena-dependency_injection:
     git: https://github.com/athena-framework/dependency-injection.git
-    version: 0.2.2
+    version: 0.2.3
 
   athena-event_dispatcher:
     git: https://github.com/athena-framework/event-dispatcher.git
@@ -46,7 +46,7 @@ shards:
 
   halite:
     git: https://github.com/icyleaf/halite.git
-    version: 0.10.7
+    version: 0.10.8
 
   jwt:
     git: https://github.com/crystal-community/jwt.git
