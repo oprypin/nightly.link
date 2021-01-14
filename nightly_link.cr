@@ -398,12 +398,17 @@ class ArtifactsController < ART::Controller
   end
 end
 
+CSS_HEADERS = HTTP::Headers{
+  "content-type"  => MIME.from_extension(".css"),
+  "cache-control" => "max-age=#{100.days.total_seconds}",
+}
+
 class StaticController < ART::Controller
   @[ART::Get(path: "/github-markdown.min.css")]
   def css : ART::Response
     ART::Response.new(
       {{read_file("#{__DIR__}/github-markdown.min.css")}},
-      headers: HTTP::Headers{"content-type" => MIME.from_extension(".css")}
+      headers: CSS_HEADERS
     )
   end
 end
