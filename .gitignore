@@ -1,0 +1,9 @@
+*
+!.gitignore
+!LICENSE
+!Makefile
+!*.md
+!/shard.yml
+!/shard.lock
+!/*.cr
+!/templates/*.html
