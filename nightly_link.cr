@@ -207,7 +207,12 @@ class DashboardController < ART::Controller
       n += 1
     end
     n.times do
-      installations << ch.receive
+      select
+      when x = ch.receive
+        installations << x
+      when timeout(5.seconds)
+        break
+      end
     end
 
     return ART::StreamedResponse.new(headers: HTML_HEADERS) do |io|
@@ -262,17 +267,39 @@ class DashboardController < ART::Controller
 end
 
 private def get_latest_run(repo_owner : String, repo_name : String, workflow : String, branch : String, token : InstallationToken)
-  artifacts = begin
-    WorkflowRuns.for_workflow(repo_owner, repo_name, workflow, branch, token, max_items: 1, expires_in: 5.minutes)
-  rescue e : Halite::Exception::ClientError
-    if e.status_code.in?(401, 404)
-      raise ART::Exceptions::NotFound.new("Repository '#{repo_owner}/#{repo_name}' or workflow '#{workflow}' not found")
+  ch = Channel(Array(WorkflowRun) | Exception).new
+  {% for event in [{"push", 5}, {"schedule", 60}] %}
+    spawn do
+      ch.send begin
+        WorkflowRuns.for_workflow(repo_owner, repo_name, workflow, branch: branch, event: {{event[0]}}, token: token, max_items: 1, expires_in: {{event[1]}}.minutes)
+      rescue e
+        if e.is_a?(Halite::Exception::ClientError) && e.status_code.in?(401, 404)
+          e = ART::Exceptions::NotFound.new("Repository '#{repo_owner}/#{repo_name}' or workflow '#{workflow}' not found")
+        end
+        e
+      end
     end
-    raise e
+  {% end %}
+
+  runs = Array(WorkflowRun).new
+  exc = nil
+  2.times do
+    select
+    when x = ch.receive
+      case x
+      in Exception
+        exc ||= x
+      in Array
+        runs.concat(x)
+      end
+    when timeout(5.seconds)
+      break
+    end
   end
-  artifacts.find do |run|
-    run.event.in?("push", "schedule")
-  end || raise ART::Exceptions::NotFound.new("No successful runs found for workflow '#{workflow}' and branch '#{branch}'")
+  if runs.empty?
+    raise exc || ART::Exceptions::NotFound.new("No successful runs found for workflow '#{workflow}' and branch '#{branch}'")
+  end
+  runs.max_by &.updated_at
 end
 
 class ArtifactsController < ART::Controller

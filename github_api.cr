@@ -236,11 +236,11 @@ struct WorkflowRuns
     )
   end
 
-  cached_array def self.for_workflow(repo_owner : String, repo_name : String, workflow : String, branch : String, token : InstallationToken | UserToken, max_items : Int32, & : WorkflowRun ->)
+  cached_array def self.for_workflow(repo_owner : String, repo_name : String, workflow : String, branch : String, event : String, token : InstallationToken | UserToken, max_items : Int32, & : WorkflowRun ->)
     # https://docs.github.com/v3/actions#list-workflow-runs
     get_json_list(
       WorkflowRuns, "repos/#{repo_owner}/#{repo_name}/actions/workflows/#{workflow}/runs",
-      params: {branch: branch, status: "success"},
+      params: {branch: branch, event: event, status: "success"},
       headers: {authorization: token}, max_items: max_items
     )
   end
