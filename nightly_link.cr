@@ -425,19 +425,23 @@ class ArtifactsController < ART::Controller
   end
 end
 
-CSS_HEADERS = HTTP::Headers{
-  "content-type"  => MIME.from_extension(".css"),
-  "cache-control" => "max-age=#{100.days.total_seconds}",
-}
-
 class StaticController < ART::Controller
-  @[ART::Get(path: "/github-markdown.min.css")]
-  def css : ART::Response
-    ART::Response.new(
-      {{read_file("#{__DIR__}/github-markdown.min.css")}},
-      headers: CSS_HEADERS
-    )
-  end
+  {% for path, i in ["github-markdown.min.css", "logo.svg"] %}
+    {% ext = path.split(".")[-1] %}
+    {% headers = "#{ext.upcase.id}_HEADERS".id %}
+    {{headers}} = HTTP::Headers{
+      "content-type"  => MIME.from_extension({{"." + ext}}),
+      "cache-control" => "max-age=#{100.days.total_seconds}",
+    }
+
+    @[ART::Get(path: {{"/#{path.id}"}})]
+    def static{{i}} : ART::Response
+      ART::Response.new(
+        {{read_file("#{__DIR__}/#{path.id}")}},
+        headers: {{headers}}
+      )
+    end
+  {% end %}
 end
 
 ART.run(host: "127.0.0.1", port: PORT)

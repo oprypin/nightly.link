@@ -3,6 +3,7 @@
 !LICENSE
 !Makefile
 !*.md
+!/logo.svg
 !/shard.yml
 !/shard.lock
 !/*.cr
