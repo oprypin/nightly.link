@@ -25,18 +25,7 @@
          id="stop877" />
     </linearGradient>
     <linearGradient
-       id="linearGradient855">
-      <stop
-         style="stop-color:#000000;stop-opacity:1;"
-         offset="0"
-         id="stop851" />
-      <stop
-         style="stop-color:#800080;stop-opacity:1"
-         offset="1"
-         id="stop853" />
-    </linearGradient>
-    <linearGradient
-       xlink:href="#linearGradient855"
+       xlink:href="#linearGradient879"
        id="linearGradient857"
        x1="0"
        y1="0"
@@ -69,7 +58,7 @@
   <g
      id="layer1">
     <circle
-       style="fill:url(#linearGradient857);fill-opacity:1;stroke:url(#linearGradient873);stroke-width:0;stroke-linecap:round;stroke-opacity:1"
+       style="fill:url(#linearGradient857);fill-opacity:1.0;stroke:url(#linearGradient873);stroke-width:0;stroke-linecap:round;stroke-opacity:1"
        id="path833"
        cx="8.4666662"
        cy="8.4666672"
