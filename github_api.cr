@@ -96,21 +96,19 @@ macro get_json_list(t, url, params = NamedTuple.new, max_items = 1000, **kwargs)
   %url : String? = {{url}}
   %max_items : Int32 = {{max_items}}
   %params = {per_page: %max_items}.merge({{params}})
-  n = 0
+  %n = 0
   while %url
-    %result = nil
-    GitHub.get(%url, params: %params, {{**kwargs}}) do |resp|
-      resp.raise_for_status
-      %result = {{t}}.from_json(resp.body_io)
-      %url = resp.links.try(&.["next"]?).try(&.target)
-      %params = {per_page: %max_items}
-    end
-    %result.not_nil!{% if t.is_a?(Path) %}.{{t.id.underscore}}{% end %}.each do |x|
+    %resp = GitHub.get(%url, params: %params, {{**kwargs}})
+    %resp.raise_for_status
+    %result = {{t}}.from_json(%resp.body)
+    %url = %resp.links.try(&.["next"]?).try(&.target)
+    %params = {per_page: %max_items}
+    %result {% if t.is_a?(Path) %}.{{t.id.underscore}}{% end %}.each do |x|
       yield x
-      n += 1
-      break if n >= %max_items
+      %n += 1
+      break if %n >= %max_items
     end
-    break if n >= %max_items
+    break if %n >= %max_items
   end
 end
 
