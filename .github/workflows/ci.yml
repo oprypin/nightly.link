@@ -18,6 +18,6 @@ jobs:
       - name: Install dependencies
         run: shards install
       - name: Build
-        run: make
+        run: make -j
       - name: Check formatting
         run: crystal tool format --check

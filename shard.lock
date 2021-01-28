@@ -22,7 +22,7 @@ shards:
 
   athena-serializer:
     git: https://github.com/athena-framework/serializer.git
-    version: 0.2.2
+    version: 0.2.3
 
   athena-validator:
     git: https://github.com/athena-framework/validator.git
@@ -50,7 +50,7 @@ shards:
 
   jwt:
     git: https://github.com/crystal-community/jwt.git
-    version: 1.4.2
+    version: 1.5.0
 
   markd:
     git: https://github.com/icyleaf/markd.git
@@ -61,10 +61,10 @@ shards:
     version: 0.4
 
   openssl_ext:
-    git: https://github.com/stakach/openssl_ext.git
-    version: 1.2.2
+    git: https://github.com/spider-gazelle/openssl_ext.git
+    version: 2.0.0
 
   sqlite3:
     git: https://github.com/crystal-lang/crystal-sqlite3.git
-    version: 0.17.0
+    version: 0.18.0
 
