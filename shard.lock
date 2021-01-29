@@ -36,13 +36,13 @@ shards:
     git: https://github.com/kostya/cron_parser.git
     version: 0.3.0
 
-  cron_scheduler:
-    git: https://github.com/kostya/cron_scheduler.git
-    version: 0.3.0
-
   db:
     git: https://github.com/crystal-lang/crystal-db.git
     version: 0.10.0
+
+  future:
+    git: https://github.com/crystal-community/future.cr.git
+    version: 0.1.0
 
   halite:
     git: https://github.com/icyleaf/halite.git
@@ -62,9 +62,13 @@ shards:
 
   openssl_ext:
     git: https://github.com/spider-gazelle/openssl_ext.git
-    version: 2.0.0
+    version: 2.0.1
 
   sqlite3:
     git: https://github.com/crystal-lang/crystal-sqlite3.git
     version: 0.18.0
+
+  tasker:
+    git: https://github.com/spider-gazelle/tasker.git
+    version: 2.0.2
 

@@ -1,6 +1,9 @@
+require "log"
+
 require "halite"
 require "memory_cache"
 require "jwt"
+require "tasker"
 
 require "./cache_util"
 
@@ -56,9 +59,9 @@ class GitHubAppAuth
   end
 
   private def new_token(installation_id : InstallationId) : InstallationToken
-    if (old_token = @@token.read(installation_id))
-      spawn do
-        puts "Token for ##{installation_id} had #{RateLimits.for_token(old_token.not_nil!)}"
+    Tasker.in(TOKEN_EXPIRATION * 0.98) do
+      if (old_token = @@token.read(installation_id))
+        Log.info { "Token for ##{installation_id} had #{RateLimits.for_token(old_token)}" }
       end
     end
     resp = GitHub.post(
@@ -70,11 +73,13 @@ class GitHubAppAuth
     InstallationToken.from_json(resp.body)
   end
 
+  TOKEN_EXPIRATION = 55.minutes
+
   def token(installation_id : InstallationId, *, new : Bool = false) : InstallationToken
     if new
-      @@token.write(installation_id, new_token(installation_id), expires_in: 55.minutes)
+      @@token.write(installation_id, new_token(installation_id), expires_in: TOKEN_EXPIRATION)
     else
-      @@token.fetch(installation_id, expires_in: 55.minutes) do
+      @@token.fetch(installation_id, expires_in: TOKEN_EXPIRATION) do
         new_token(installation_id)
       end
     end

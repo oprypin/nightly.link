@@ -16,8 +16,8 @@ dependencies:
     github: icyleaf/halite
   memory_cache:
     github: kostya/memory_cache
-  cron_scheduler:
-    github: kostya/cron_scheduler
+  tasker:
+    github: spider-gazelle/tasker
   sqlite3:
     github: crystal-lang/crystal-sqlite3
   markd:

@@ -1,5 +1,5 @@
 require "memory_cache"
-require "cron_scheduler"
+require "tasker"
 
 alias DowncaseString = String
 
@@ -36,10 +36,8 @@ class CleanedMemoryCache(K, V) < MemoryCache(K, V)
   end
 end
 
-CronScheduler.define do
-  at("0 19 * * *") do # every day 19:00
-    CleanedMemoryCache.cleanups.each do |cleanup|
-      cleanup.call
-    end
+Tasker.cron("0 19 * * *") do # every day 19:00
+  CleanedMemoryCache.cleanups.each do |cleanup|
+    cleanup.call
   end
 end
