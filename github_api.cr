@@ -67,7 +67,7 @@ class GitHubAppAuth
     resp = GitHub.post(
       "/app/installations/#{installation_id}/access_tokens",
       json: {permissions: {actions: "read"}},
-      headers: {authorization: jwt}
+      headers: {Authorization: jwt}
     )
     resp.raise_for_status
     InstallationToken.from_json(resp.body)
@@ -122,7 +122,7 @@ struct Installations
     # https://docs.github.com/v3/apps#list-app-installations-accessible-to-the-user-access-token
     get_json_list(
       Installations, "user/installations",
-      headers: {authorization: token}, max_items: 10
+      headers: {Authorization: token}, max_items: 10
     )
   end
 
@@ -131,7 +131,7 @@ struct Installations
     params = {since: since && (since + 1.millisecond).to_rfc3339(fraction_digits: 3)}
     get_json_list(
       Array(Installation), "app/installations", params: params,
-      headers: {authorization: token}, max_items: 100000
+      headers: {Authorization: token}, max_items: 100000
     )
   end
 end
@@ -151,7 +151,7 @@ struct Installation
 
   def self.for_id(id : InstallationId, token : AppToken) : Installation
     # https://docs.github.com/v3/apps#get-an-installation-for-the-authenticated-app
-    resp = GitHub.get("app/installations/#{id}", headers: {authorization: token})
+    resp = GitHub.get("app/installations/#{id}", headers: {Authorization: token})
     resp.raise_for_status
     Installation.from_json(resp.body)
   end
@@ -163,7 +163,7 @@ struct Account
 
   def self.for_oauth(token : OAuthToken) : Account
     # https://docs.github.com/v3/users#get-the-authenticated-user
-    resp = GitHub.get("user", headers: {authorization: token})
+    resp = GitHub.get("user", headers: {Authorization: token})
     resp.raise_for_status
     Account.from_json(resp.body)
   end
@@ -177,7 +177,7 @@ struct Repositories
     # https://docs.github.com/v3/apps#list-repositories-accessible-to-the-user-access-token
     get_json_list(
       Repositories, "user/installations/#{installation_id}/repositories",
-      headers: {authorization: token}, max_items: 300
+      headers: {Authorization: token}, max_items: 300
     )
   end
 
@@ -185,7 +185,7 @@ struct Repositories
     # https://docs.github.com/v3/apps#list-repositories-accessible-to-the-app-installation
     get_json_list(
       Repositories, "installation/repositories",
-      headers: {authorization: token}, max_items: 300
+      headers: {Authorization: token}, max_items: 300
     )
   end
 end
@@ -217,7 +217,7 @@ struct WorkflowRuns
     get_json_list(
       WorkflowRuns, "repos/#{repo_owner}/#{repo_name}/actions/workflows/#{workflow}/runs",
       params: {branch: branch, event: event, status: "success"},
-      headers: {authorization: token}, max_items: max_items
+      headers: {Authorization: token}, max_items: max_items
     )
   end
 end
@@ -242,7 +242,7 @@ struct Artifacts
     # https://docs.github.com/v3/actions#list-workflow-run-artifacts
     get_json_list(
       Artifacts, "repos/#{repo_owner}/#{repo_name}/actions/runs/#{run_id}/artifacts",
-      headers: {authorization: token}, max_items: 100
+      headers: {Authorization: token}, max_items: 100
     )
   end
 end
@@ -273,7 +273,7 @@ struct Artifact
       # https://docs.github.com/en/free-pro-team@latest/rest/reference/actions#download-an-artifact
       resp = GitHub.get(
         "repos/#{repo_owner}/#{repo_name}/actions/artifacts/#{artifact_id}/zip",
-        headers: {authorization: token}
+        headers: {Authorization: token}
       )
       if resp.status_code == 500 && resp.body.includes?("Failed to generate URL to download artifact")
         raise GitHubArtifactDownloadError.new(status_code: resp.status_code, uri: resp.uri)
@@ -290,7 +290,7 @@ struct RateLimits
   property core : Rate
 
   def self.for_token(token : Token) : RateLimits
-    resp = GitHub.get("rate_limit", headers: {authorization: token})
+    resp = GitHub.get("rate_limit", headers: {Authorization: token})
     resp.raise_for_status
     RateLimits.from_json(resp.body, root: "resources")
   end

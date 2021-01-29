@@ -108,7 +108,7 @@ record RepoInstallation,
   end
 end
 
-HTML_HEADERS = HTTP::Headers{"content-type" => MIME.from_extension(".html")}
+HTML_HEADERS = HTTP::Headers{"Content-Type" => MIME.from_extension(".html")}
 
 class DashboardController < ART::Controller
   RECONFIGURE_URL = "https://github.com/apps/#{GITHUB_APP_NAME}/installations/new"
@@ -218,7 +218,7 @@ class DashboardController < ART::Controller
 
     canonical = generate_url("dashboard", reference_type: :absolute_url)
     return ART::StreamedResponse.new(headers: HTTP::Headers{
-      "content-type" => MIME.from_extension(".html"),
+      "Content-Type" => MIME.from_extension(".html"),
       "X-Robots-Tag" => "noindex",
     }) do |io|
       ECR.embed("templates/head.html", io)
@@ -441,8 +441,8 @@ class StaticController < ART::Controller
     {% ext = path.split(".")[-1] %}
     {% headers = "#{ext.upcase.id}_HEADERS".id %}
     {{headers}} = HTTP::Headers{
-      "content-type"  => MIME.from_extension({{"." + ext}}),
-      "cache-control" => "max-age=#{100.days.total_seconds}",
+      "Content-Type"  => MIME.from_extension({{"." + ext}}),
+      "Cache-Control" => "max-age=#{100.days.total_seconds}",
     }
 
     @[ART::Get(path: {{"/#{path.id}"}})]
