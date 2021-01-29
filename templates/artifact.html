@@ -12,9 +12,12 @@
     <% links.each_with_index do |link, i| %>
       <% if link.ext == ext %>
         <li>
-          <a href="<%= HTML.escape(link.url) %>"<% if link.ext %> _target="blank"<% end %>><%= HTML.escape(link.title || link.url) %></a>
-          <% if i == 0 %>(this page)<% end %>
-          <% if (zip = link.zip) %><br><% if i == 0 %><b><% end %><a href="<%= HTML.escape(zip) %>"><%= HTML.escape(zip) %><% if i == 0 %></b><% end %></a> (direct download)<% end %>
+          <% if (zip = link.zip) %>
+            <% if i == 0 %><b><% end %><a href="<%= HTML.escape(zip) %>"><%= HTML.escape(zip) %><% if i == 0 %></b><% end %></a> (direct download)
+          <% else %>
+            <a href="<%= HTML.escape(link.url) %>"<% if link.ext %> _target="blank"<% end %>><%= HTML.escape(link.title || link.url) %></a>
+            <% if i == 0 %>(this page)<% end %>
+          <% end %>
         </li>
       <% end %>
     <% end %>

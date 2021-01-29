@@ -43,7 +43,7 @@ record RepoInstallation,
 
   def self.read(*, repo_owner : String) : RepoInstallation?
     D.query(%(
-      SELECT installation_id, public_repos, private_repos FROM installations WHERE repo_owner = ? LIMIT 1
+      SELECT installation_id, public_repos, private_repos FROM installations WHERE repo_owner = ? COLLATE NOCASE LIMIT 1
     ), repo_owner) do |rs|
       rs.each do
         return new(
@@ -70,8 +70,8 @@ record RepoInstallation,
         args = {GitHubApp.token(installation.id)}
       {% end %}
       Repositories.for_installation(*args) do |repo|
-        if (repo_name = repo.full_name.lchop?("#{installation.account.login}/"))
-          (repo.private? ? private_repos : public_repos) << repo_name
+        if repo.owner == installation.account.login
+          (repo.private? ? private_repos : public_repos) << repo.name
         end
       end
       inst = RepoInstallation.new(
@@ -91,7 +91,7 @@ record RepoInstallation,
 
   def verify(*, repo_name : String, h : String?) : String?
     result = nil
-    unless public_repos.includes?(repo_name) ||
+    unless public_repos.any? { |r| r.downcase == repo_name.downcase } ||
            h && private_repos.includes?(repo_name) && h == (result = password(repo_name))
       raise ART::Exceptions::NotFound.new("Repository not found: '#{repo_owner}/#{repo_name}'")
     end
@@ -122,22 +122,23 @@ class DashboardController < ART::Controller
     "https://github.com/quassel/quassel/blob/master/.github/workflows/main.yml",
   ]
 
-  def workflow_pattern(repo : String) : Regex
-    %r(^https?://github.com/(#{repo})/(blob|tree|raw|blame|commits)/([^/]+)/\.github/workflows/([^/]+\.ya?ml)$)
+  def workflow_pattern(repo_owner : String, repo_name : String) : Regex
+    %r(^https?://github.com/(#{repo_owner})/(#{repo_name})/(blob|tree|raw|blame|commits)/([^/]+)/\.github/workflows/([^/]+\.ya?ml)$)
   end
 
   def workflow_pattern : Regex
-    %r(^https?://github.com/([^/]+/[^/]+)/(blob|tree|raw|blame|commits)/([^/]+)/\.github/workflows/([^/]+\.ya?ml)$)
+    %r(^https?://github.com/([^/]+)/([^/]+)/(blob|tree|raw|blame|commits)/([^/]+)/\.github/workflows/([^/]+\.ya?ml)$)
   end
 
-  def workflow_placeholder(repo = "$user/$repo") : String
-    "https://github.com/#{repo}/blob/$branch/.github/workflows/$workflow.yml"
+  def workflow_placeholder(repo_owner = "$user", repo_name = "$repo") : String
+    "https://github.com/#{repo_owner}/#{repo_name}/blob/$branch/.github/workflows/$workflow.yml"
   end
 
-  @[ART::Get("/")]
+  @[ART::Get("/", name: "index")]
   def index : ART::Response
     messages = Tuple.new
     url = h = nil
+    canonical = generate_url("index", reference_type: :absolute_url)
     ART::StreamedResponse.new(headers: HTML_HEADERS) do |io|
       ECR.embed("templates/head.html", io)
       io << "<title>nightly.link</title>"
@@ -145,7 +146,7 @@ class DashboardController < ART::Controller
     end
   end
 
-  @[ART::Post("/")]
+  @[ART::Post("/", name: "index_form")]
   def index_form(request : HTTP::Request) : ART::Response
     if (body = request.body)
       data = HTTP::Params.parse(body.gets_to_end)
@@ -156,18 +157,18 @@ class DashboardController < ART::Controller
     messages = [] of String
     if url.presence
       if url =~ workflow_pattern
-        repo, branch, workflow = $1, $3, $4
+        repo_owner, repo_name, branch, workflow = $1, $2, $4, $5
         if branch =~ /^[0-9a-fA-F]{32,}$/
           messages.unshift("Make sure you're on a branch (such as 'master'), not a commit (which '#{$0}' seems to be).")
         else
-          link = "/#{repo}/workflows/#{workflow.rchop(".yml")}/#{branch}"
-          link += "?h=#{h}" if h
+          link = generate_url("dash_by_branch", :absolute_url, repo_owner: repo_owner, repo_name: repo_name, workflow: workflow.rchop(".yml"), branch: branch, h: h)
           return ART::RedirectResponse.new(link)
         end
       end
       messages.unshift("Did not detect a link to a GitHub workflow file.")
     end
 
+    canonical = generate_url("index_form", reference_type: :absolute_url)
     ART::StreamedResponse.new(headers: HTML_HEADERS) do |io|
       ECR.embed("templates/head.html", io)
       io << "<title>nightly.link</title>"
@@ -176,7 +177,7 @@ class DashboardController < ART::Controller
   end
 
   @[ART::QueryParam("code")]
-  @[ART::Get("/dashboard")]
+  @[ART::Get("/dashboard", name: "dashboard")]
   def do_auth(code : String? = nil) : ART::Response
     if !code
       return ART::RedirectResponse.new(AUTH_URL)
@@ -215,7 +216,11 @@ class DashboardController < ART::Controller
       end
     end
 
-    return ART::StreamedResponse.new(headers: HTML_HEADERS) do |io|
+    canonical = generate_url("dashboard", reference_type: :absolute_url)
+    return ART::StreamedResponse.new(headers: HTTP::Headers{
+      "content-type" => MIME.from_extension(".html"),
+      "X-Robots-Tag" => "noindex",
+    }) do |io|
       ECR.embed("templates/head.html", io)
       ECR.embed("templates/dashboard.html", io)
     end
@@ -234,7 +239,7 @@ class DashboardController < ART::Controller
   record Link, url : String, title : String
 
   @[ART::QueryParam("h")]
-  @[ART::Get("/:repo_owner/:repo_name/workflows/:workflow/:branch")]
+  @[ART::Get("/:repo_owner/:repo_name/workflows/:workflow/:branch", name: "dash_by_branch")]
   def by_branch(repo_owner : String, repo_name : String, workflow : String, branch : String, h : String?) : ART::Response
     token, h = RepoInstallation.verified_token(repo_owner, repo_name, h: h)
     unless workflow.to_i? || workflow.ends_with?(".yml") || workflow.ends_with?(".yaml")
@@ -242,6 +247,7 @@ class DashboardController < ART::Controller
     end
 
     run = get_latest_run(repo_owner, repo_name, workflow, branch, token)
+    repo_owner, repo_name = run.repository.owner, run.repository.name
     if run.updated_at < 90.days.ago
       message = "Warning: the latest successful run is older than 90 days, and its artifacts likely expired."
     end
@@ -257,8 +263,10 @@ class DashboardController < ART::Controller
 
     title = {"Repository #{repo_owner}/#{repo_name}", "Workflow #{workflow} | Branch #{branch}"}
     links = artifacts.map do |art|
-      Link.new("/#{repo_owner}/#{repo_name}/workflows/#{workflow.rchop(".yml")}/#{branch}/#{art.name}#{"?h=#{h}" if h}", art.name)
+      link = generate_url("by_branch", :absolute_url, repo_owner: repo_owner, repo_name: repo_name, workflow: workflow.rchop(".yml"), branch: branch, artifact: art.name, h: h)
+      Link.new(link, art.name)
     end
+    canonical = generate_url("dash_by_branch", :absolute_url, repo_owner: repo_owner, repo_name: repo_name, workflow: workflow.rchop(".yml"), branch: branch, h: h)
     return ART::StreamedResponse.new(headers: HTML_HEADERS) do |io|
       ECR.embed("templates/head.html", io)
       ECR.embed("templates/artifact_list.html", io)
@@ -311,20 +319,21 @@ class ArtifactsController < ART::Controller
   end
 
   @[ART::QueryParam("h")]
-  @[ART::Get("/:repo_owner/:repo_name/workflows/:workflow/:branch/:artifact")]
+  @[ART::Get("/:repo_owner/:repo_name/workflows/:workflow/:branch/:artifact", name: "by_branch")]
   def by_branch(repo_owner : String, repo_name : String, workflow : String, branch : String, artifact : String, h : String?) : ArtifactsController::Result
     token, h = RepoInstallation.verified_token(repo_owner, repo_name, h: h)
     unless workflow.to_i? || workflow.ends_with?(".yml") || workflow.ends_with?(".yaml")
       workflow += ".yml"
     end
     run = get_latest_run(repo_owner, repo_name, workflow, branch, token)
+    repo_owner, repo_name = run.repository.owner, run.repository.name
 
     result = by_run(repo_owner, repo_name, run.id, artifact, run.check_suite_url.rpartition("/").last.to_i64?, h)
     result.title = {"Repository #{repo_owner}/#{repo_name}", "Workflow #{workflow} | Branch #{branch} | Artifact #{artifact}"}
     result.links << Link.new("https://github.com/#{repo_owner}/#{repo_name}/actions?" + HTTP::Params.encode({
       query: "event:#{run.event} is:success branch:#{branch}",
     }), "GitHub: browse workflow runs on branch '#{branch}'", ext: true)
-    link = "/#{repo_owner}/#{repo_name}/workflows/#{workflow.rchop(".yml")}/#{branch}/#{artifact}"
+    link = generate_url("by_branch", :absolute_url, repo_owner: repo_owner, repo_name: repo_name, workflow: workflow.rchop(".yml"), branch: branch, artifact: artifact)
     result.links << Link.new("#{link}#{"?h=#{h}" if h}", result.title[1], zip: "#{link}.zip#{"?h=#{h}" if h}")
     return result
   end
@@ -344,6 +353,7 @@ class ArtifactsController < ART::Controller
     end
     art = artifacts.find { |a| a.name == artifact }
     raise ART::Exceptions::NotFound.new("Artifact '#{artifact}' not found for run ##{run_id}") if !art
+    repo_owner, repo_name = art.repository.owner, art.repository.name
 
     result = by_artifact(repo_owner, repo_name, art.id, check_suite_id, h)
     result.title = {"Repository #{repo_owner}/#{repo_name}", "Run ##{run_id} | Artifact #{artifact}"}
@@ -351,13 +361,13 @@ class ArtifactsController < ART::Controller
       "https://github.com/#{repo_owner}/#{repo_name}/actions/runs/#{run_id}",
       "GitHub: view run ##{run_id}", ext: true
     )
-    # link = "/#{repo_owner}/#{repo_name}/actions/runs/#{run_id}/#{artifact}"
+    # link = generate_url("by_run", repo_owner: repo_owner, repo_name: repo_name, run_id: run_id, artifact: artifact)
     # result.links << Link.new("#{link}#{"?h=#{h}" if h}", result.title[1], zip: "#{link}.zip#{"?h=#{h}" if h}")
     return result
   end
 
   @[ART::QueryParam("h")]
-  @[ART::Get("/:repo_owner/:repo_name/actions/artifacts/:artifact_id")]
+  @[ART::Get("/:repo_owner/:repo_name/actions/artifacts/:artifact_id", name: "by_artifact")]
   def by_artifact(repo_owner : String, repo_name : String, artifact_id : Int64, check_suite_id : Int64?, h : String?) : ArtifactsController::Result
     token, h = RepoInstallation.verified_token(repo_owner, repo_name, h: h)
     tmp_link = begin
@@ -377,7 +387,7 @@ class ArtifactsController < ART::Controller
       "https://github.com/#{repo_owner}/#{repo_name}/suites/#{check_suite_id}/artifacts/#{artifact_id}",
       "GitHub: direct download of artifact ##{artifact_id} (requires GitHub login)", ext: true
     ) if check_suite_id
-    link = "/#{repo_owner}/#{repo_name}/actions/artifacts/#{artifact_id}"
+    link = generate_url("by_artifact", :absolute_url, repo_owner: repo_owner, repo_name: repo_name, artifact_id: artifact_id)
     result.links << Link.new("#{link}#{"?h=#{h}" if h}", result.title[1], zip: "#{link}.zip#{"?h=#{h}" if h}")
     return result
   end
@@ -409,6 +419,7 @@ class ArtifactsController < ART::Controller
         else
           title = result.title
           links = result.links.reverse!
+          canonical = links.first.url
           event.response = ART::StreamedResponse.new(headers: HTML_HEADERS) do |io|
             ECR.embed("templates/head.html", io)
             ECR.embed("templates/artifact.html", io)

@@ -7,4 +7,5 @@
 !/shard.yml
 !/shard.lock
 !/*.cr
+!/templates
 !/templates/*.html

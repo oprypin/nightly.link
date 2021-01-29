@@ -1,7 +1,9 @@
 require "memory_cache"
 require "cron_scheduler"
 
-macro cached_array(f)
+alias DowncaseString = String
+
+macro cached_array(f, norm = {} of String => String)
   {{f}}
 
   {% typ = f.block_arg.restriction.inputs[0] %}
@@ -9,6 +11,11 @@ macro cached_array(f)
 
   {% for block in [true, false] %}
     def {% if f.receiver %}{{f.receiver}}.{% end %}{{f.name}}({{*f.args}}, expires_in : Time::Span) : Array({{typ}})
+      {% for arg in f.args %}
+        {% if arg.restriction.id == "DowncaseString".id %}
+          {{arg.internal_name}} = {{arg.internal_name}}.downcase
+        {% end %}
+      {% end %}
       @@cache_{{f.name}}.fetch({ {{*f.args.map &.internal_name}} }, expires_in: expires_in) do
         Array({{typ}}).new.tap do |result|
           {{f.name}}({{*f.args.map &.internal_name}}) do |item|

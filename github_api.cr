@@ -197,15 +197,26 @@ end
 struct Repository
   include JSON::Serializable
   property full_name : String
-  property? private : Bool
-  property? fork : Bool
+  property? private : Bool = false
+  property? fork : Bool = false
+
+  def initialize(@full_name)
+  end
+
+  def owner : String
+    full_name.partition('/').first
+  end
+
+  def name : String
+    full_name.partition('/').last
+  end
 end
 
 struct WorkflowRuns
   include JSON::Serializable
   property workflow_runs : Array(WorkflowRun)
 
-  cached_array def self.for_workflow(repo_owner : String, repo_name : String, workflow : String, branch : String, event : String, token : InstallationToken | UserToken, max_items : Int32, & : WorkflowRun ->)
+  cached_array def self.for_workflow(repo_owner : DowncaseString, repo_name : DowncaseString, workflow : String, branch : String, event : String, token : InstallationToken | UserToken, max_items : Int32, & : WorkflowRun ->)
     # https://docs.github.com/v3/actions#list-workflow-runs
     get_json_list(
       WorkflowRuns, "repos/#{repo_owner}/#{repo_name}/actions/workflows/#{workflow}/runs",
@@ -224,13 +235,14 @@ struct WorkflowRun
   property check_suite_url : String
   @[JSON::Field(converter: RFC3339Converter)]
   property updated_at : Time
+  property repository : Repository
 end
 
 struct Artifacts
   include JSON::Serializable
   property artifacts : Array(Artifact)
 
-  cached_array def self.for_run(repo_owner : String, repo_name : String, run_id : Int64, token : InstallationToken | UserToken, & : Artifact ->)
+  cached_array def self.for_run(repo_owner : DowncaseString, repo_name : DowncaseString, run_id : Int64, token : InstallationToken | UserToken, & : Artifact ->)
     # https://docs.github.com/v3/actions#list-workflow-run-artifacts
     get_json_list(
       Artifacts, "repos/#{repo_owner}/#{repo_name}/actions/runs/#{run_id}/artifacts",
@@ -246,10 +258,21 @@ struct Artifact
   include JSON::Serializable
   property id : Int64
   property name : String
+  property url : String
+
+  def repository : Repository
+    if url =~ %r(^https://[^/]+/repos/([^/]+/[^/]+)/)
+      Repository.new($1)
+    else
+      raise ArgumentError.new(url)
+    end
+  end
 
   @@cache_zip_by_id = CleanedMemoryCache({String, String, Int64}, String).new
 
   def self.zip_by_id(repo_owner : String, repo_name : String, artifact_id : Int64, token : InstallationToken | UserToken) : String
+    repo_owner = repo_owner.downcase
+    repo_name = repo_name.downcase
     @@cache_zip_by_id.fetch({repo_owner, repo_name, artifact_id}, expires_in: 50.seconds) do
       # https://docs.github.com/en/free-pro-team@latest/rest/reference/actions#download-an-artifact
       resp = GitHub.get(
