@@ -61,16 +61,13 @@ class GitHubAppAuth
         puts "Token for ##{installation_id} had #{RateLimits.for_token(old_token.not_nil!)}"
       end
     end
-    result = nil
-    GitHub.post(
+    resp = GitHub.post(
       "/app/installations/#{installation_id}/access_tokens",
       json: {permissions: {actions: "read"}},
       headers: {authorization: jwt}
-    ) do |resp|
-      resp.raise_for_status
-      result = InstallationToken.from_json(resp.body_io)
-    end
-    result.not_nil!
+    )
+    resp.raise_for_status
+    InstallationToken.from_json(resp.body)
   end
 
   def token(installation_id : InstallationId, *, new : Bool = false) : InstallationToken
@@ -149,12 +146,9 @@ struct Installation
 
   def self.for_id(id : InstallationId, token : AppToken) : Installation
     # https://docs.github.com/v3/apps#get-an-installation-for-the-authenticated-app
-    result = nil
-    GitHub.get("app/installations/#{id}", headers: {authorization: token}) do |resp|
-      resp.raise_for_status
-      result = Installation.from_json(resp.body_io)
-    end
-    result.not_nil!
+    resp = GitHub.get("app/installations/#{id}", headers: {authorization: token})
+    resp.raise_for_status
+    Installation.from_json(resp.body)
   end
 end
 
@@ -164,12 +158,9 @@ struct Account
 
   def self.for_oauth(token : OAuthToken) : Account
     # https://docs.github.com/v3/users#get-the-authenticated-user
-    result = nil
-    GitHub.get("user", headers: {authorization: token}) do |resp|
-      resp.raise_for_status
-      result = Account.from_json(resp.body_io)
-    end
-    result.not_nil!
+    resp = GitHub.get("user", headers: {authorization: token})
+    resp.raise_for_status
+    Account.from_json(resp.body)
   end
 end
 
@@ -294,15 +285,9 @@ struct RateLimits
   property core : Rate
 
   def self.for_token(token : Token) : RateLimits
-    result = nil
-    GitHub.get(
-      "rate_limit",
-      headers: {authorization: token}
-    ) do |resp|
-      resp.raise_for_status
-      result = RateLimits.from_json(resp.body_io, root: "resources")
-    end
-    result.not_nil!
+    resp = GitHub.get("rate_limit", headers: {authorization: token})
+    resp.raise_for_status
+    RateLimits.from_json(resp.body, root: "resources")
   end
 end
 
