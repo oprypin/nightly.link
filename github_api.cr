@@ -201,38 +201,9 @@ struct Repository
   property? fork : Bool
 end
 
-struct Workflows
-  include JSON::Serializable
-  property workflows : Array(Workflow)
-
-  cached_array def self.for_repo(repo_owner : String, repo_name : String, token : InstallationToken | UserToken, & : Workflow ->)
-    # https://docs.github.com/v3/actions#list-repository-workflows
-    get_json_list(
-      Workflows, "/repos/#{repo_owner}/#{repo_name}/actions/workflows",
-      headers: {authorization: token}, max_items: 100
-    )
-  end
-end
-
-struct Workflow
-  include JSON::Serializable
-  property id : Int64
-  property name : String
-  property path : String
-end
-
 struct WorkflowRuns
   include JSON::Serializable
   property workflow_runs : Array(WorkflowRun)
-
-  cached_array def self.for_repo(repo_owner : String, repo_name : String, token : InstallationToken | UserToken, max_items : Int32, & : WorkflowRun ->)
-    # https://docs.github.com/v3/actions#list-workflow-runs-for-a-repository
-    get_json_list(
-      WorkflowRuns, "repos/#{repo_owner}/#{repo_name}/actions/runs",
-      params: {event: "push", status: "success"},
-      headers: {authorization: token}, max_items: max_items
-    )
-  end
 
   cached_array def self.for_workflow(repo_owner : String, repo_name : String, workflow : String, branch : String, event : String, token : InstallationToken | UserToken, max_items : Int32, & : WorkflowRun ->)
     # https://docs.github.com/v3/actions#list-workflow-runs
