@@ -123,11 +123,11 @@ class DashboardController < ART::Controller
   ]
 
   def workflow_pattern(repo_owner : String, repo_name : String) : Regex
-    %r(^https?://github.com/(#{repo_owner})/(#{repo_name})/(blob|tree|raw|blame|commits)/([^/]+)/\.github/workflows/([^/]+\.ya?ml)$)
+    %r(^https?://github.com/(#{repo_owner})/(#{repo_name})/(blob|tree|raw|blame|commits)/([^/]+)/\.github/workflows/([^/]+\.ya?ml)(#.*)?$)
   end
 
   def workflow_pattern : Regex
-    %r(^https?://github.com/([^/]+)/([^/]+)/(blob|tree|raw|blame|commits)/([^/]+)/\.github/workflows/([^/]+\.ya?ml)$)
+    %r(^https?://github.com/([^/]+)/([^/]+)/(blob|tree|raw|blame|commits)/([^/]+)/\.github/workflows/([^/]+\.ya?ml)(#.*)?$)
   end
 
   def workflow_placeholder(repo_owner = "$user", repo_name = "$repo") : String
