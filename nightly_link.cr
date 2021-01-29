@@ -455,4 +455,14 @@ class StaticController < ART::Controller
   {% end %}
 end
 
+struct ART::Listeners::Error
+  protected def log_exception(exception : Exception, &block : -> String) : Nil
+    if exception.is_a? ART::Exceptions::NotFound
+      LOGGER.warn { exception }
+    else
+      previous_def(exception, &block)
+    end
+  end
+end
+
 ART.run(host: "127.0.0.1", port: PORT)
