@@ -15,8 +15,13 @@ jobs:
         uses: oprypin/install-crystal@v1
       - name: Download source
         uses: actions/checkout@v2
+      - name: Cache dependencies
+        uses: actions/cache@v2
+        with:
+          path: lib
+          key: ${{ runner.os }}-shards-${{ hashFiles('**/shard.lock') }}
       - name: Install dependencies
-        run: shards install
+        run: shards check || shards install
       - name: Build
         run: make -j
       - name: Check formatting
