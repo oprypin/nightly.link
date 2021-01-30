@@ -502,7 +502,7 @@ end
 struct ART::Listeners::Error
   protected def log_exception(exception : Exception, &block : -> String) : Nil
     if exception.is_a? ART::Exceptions::NotFound
-      LOGGER.warn { "Not found" }
+      LOGGER.warn { "Not found: #{exception.to_s.partition('\n').first}" }
     else
       previous_def(exception, &block)
     end
