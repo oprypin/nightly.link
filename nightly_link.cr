@@ -465,4 +465,20 @@ struct ART::Listeners::Error
   end
 end
 
+struct Athena::Routing::ErrorRenderer
+  def render(exception : ::Exception) : ART::Response
+    if !exception.is_a? ART::Exceptions::HTTPException
+      exception = ART::Exceptions::HTTPException.new(:InternalServerError, "")
+    end
+    status = exception.status
+    headers = exception.headers
+    headers["Content-Type"] = "text/html"
+    canonical = nil
+    ART::StreamedResponse.new(headers: headers) do |io|
+      ECR.embed("templates/head.html", io)
+      ECR.embed("templates/error.html", io)
+    end
+  end
+end
+
 ART.run(host: "127.0.0.1", port: PORT)
