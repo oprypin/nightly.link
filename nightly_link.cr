@@ -180,7 +180,9 @@ class DashboardController < ART::Controller
   @[ART::Get("/dashboard", name: "dashboard")]
   def do_auth(code : String? = nil) : ART::Response
     if !code
-      return ART::RedirectResponse.new(AUTH_URL)
+      return ART::RedirectResponse.new(AUTH_URL, headers: HTTP::Headers{
+        "X-Robots-Tag" => "noindex",
+      })
     end
 
     resp = GitHub.post("https://github.com/login/oauth/access_token", form: {
