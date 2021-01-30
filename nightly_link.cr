@@ -4,6 +4,7 @@ require "ecr"
 require "halite"
 require "athena"
 require "sqlite3"
+require "future"
 
 require "./string_util"
 require "./github_api"
@@ -214,22 +215,11 @@ class DashboardController < ART::Controller
     end
 
     ch = Channel(RepoInstallation).new
-    installations = Array(RepoInstallation).new
-    n = 0
+    futures = [] of Future::Compute(RepoInstallation)
     Installations.for_user(token: token) do |inst|
-      spawn do
-        ch.send(RepoInstallation.refresh(inst, token))
-      end
-      n += 1
+      futures << future { RepoInstallation.refresh(inst, token) }
     end
-    n.times do
-      select
-      when x = ch.receive
-        installations << x
-      when timeout(5.seconds)
-        break
-      end
-    end
+    installations = futures.map(&.get)
 
     canonical = generate_url("dashboard", reference_type: :absolute_url)
     return ART::StreamedResponse.new(headers: HTTP::Headers{
@@ -294,47 +284,29 @@ class DashboardController < ART::Controller
 end
 
 private def get_latest_run(repo_owner : String, repo_name : String, workflow : String, branch : String, token : InstallationToken)
-  ch = Channel(Array(WorkflowRun) | Exception).new
-  {% for event in [{"push", 5}, {"schedule", 60}] %}
-    spawn do
-      ch.send begin
-        WorkflowRuns.for_workflow(repo_owner, repo_name, workflow, branch: branch, event: {{event[0]}}, token: token, max_items: 1, expires_in: {{event[1]}}.minutes)
-      rescue e
-        if e.is_a?(Halite::Exception::ClientError) && e.status_code.in?(401, 404)
+  futures = [{"push", 5.minutes}, {"schedule", 1.hour}].map do |(event, expires_in)|
+    future do
+      begin
+        WorkflowRuns.for_workflow(repo_owner, repo_name, workflow, branch: branch, event: event, token: token, max_items: 1, expires_in: expires_in)
+      rescue e : Halite::Exception::ClientError
+        if e.status_code.in?(401, 404)
           gh_link = "https://github.com/#{repo_owner}/#{repo_name}/tree/#{branch}/.github/workflows"
-          e = ART::Exceptions::NotFound.new(
+          raise ART::Exceptions::NotFound.new(
             "Repository '#{repo_owner}/#{repo_name}' or workflow '#{workflow}' not found.\n" +
             "Check on GitHub: <#{gh_link}>"
           )
         end
-        e
+        raise e
       end
-    end
-  {% end %}
-
-  runs = Array(WorkflowRun).new
-  exc = nil
-  2.times do
-    select
-    when x = ch.receive
-      case x
-      in Exception
-        exc ||= x
-      in Array
-        runs.concat(x)
-      end
-    when timeout(5.seconds)
-      break
     end
   end
+  runs = futures.map(&.get.first?).compact
   if runs.empty?
-    raise exc || begin
-      gh_link = github_actions_link(repo_owner, repo_name, event: "push", branch: branch)
-      ART::Exceptions::NotFound.new(
-        "No successful runs found for workflow '#{workflow}' and branch '#{branch}'.\n" +
-        "Check on GitHub: <#{gh_link}>"
-      )
-    end
+    gh_link = github_actions_link(repo_owner, repo_name, event: "push", branch: branch)
+    raise ART::Exceptions::NotFound.new(
+      "No successful runs found for workflow '#{workflow}' and branch '#{branch}'.\n" +
+      "Check on GitHub: <#{gh_link}>"
+    )
   end
   runs.max_by &.updated_at
 end

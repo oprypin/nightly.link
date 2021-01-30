@@ -22,5 +22,7 @@ dependencies:
     github: crystal-lang/crystal-sqlite3
   markd:
     github: icyleaf/markd
+  future:
+    github: crystal-community/future.cr
 
 license: AGPL-3.0
