@@ -32,8 +32,16 @@ end
 struct InstallationToken < Token
   include JSON::Serializable
   getter token : String
+  property! installation_id : InstallationId
 
   def initialize(@token : String)
+  end
+
+  def to_s
+    if (installation_id = @installation_id)
+      Log.info { "Using token for ##{installation_id}" }
+    end
+    super
   end
 end
 
@@ -70,7 +78,9 @@ class GitHubAppAuth
       headers: {Authorization: jwt}
     )
     resp.raise_for_status
-    InstallationToken.from_json(resp.body)
+    tok = InstallationToken.from_json(resp.body)
+    tok.installation_id = installation_id
+    tok
   end
 
   TOKEN_EXPIRATION = 55.minutes
