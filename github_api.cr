@@ -32,7 +32,7 @@ end
 struct InstallationToken < Token
   include JSON::Serializable
   getter token : String
-  property! installation_id : InstallationId
+  property installation_id : InstallationId?
 
   def initialize(@token : String)
   end
@@ -69,6 +69,7 @@ class GitHubAppAuth
   private def new_token(installation_id : InstallationId) : InstallationToken
     Tasker.in(TOKEN_EXPIRATION * 0.98) do
       if (old_token = @@token.read(installation_id))
+        old_token.installation_id = nil # Suppress logging.
         Log.info { "Token for ##{installation_id} had #{RateLimits.for_token(old_token)}" }
       end
     end
@@ -300,7 +301,7 @@ struct RateLimits
   property core : Rate
 
   def self.for_token(token : Token) : RateLimits
-    resp = GitHub.get("rate_limit", headers: {Authorization: token})
+    resp = Halite.get("https://api.github.com/rate_limit", headers: {Authorization: token})
     resp.raise_for_status
     RateLimits.from_json(resp.body, root: "resources")
   end
