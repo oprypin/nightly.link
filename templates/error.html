@@ -1,3 +1,5 @@
 <h1>Error <%= status.code %> &ndash; <%= status.description %></h1>
 
-<p><%= exception %></p>
+<%= HTML.escape(exception.to_s).gsub(/^/m, "<p>").gsub(/&lt;(.+?)&gt;/, %(<a href="\\1" rel="nofollow">\\1</a>)) %></p>
+
+<p><a href="/">Return to the home page</a>

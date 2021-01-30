@@ -93,7 +93,10 @@ record RepoInstallation,
     result = nil
     unless public_repos.any? { |r| r.downcase == repo_name.downcase } ||
            h && private_repos.includes?(repo_name) && h == (result = password(repo_name))
-      raise ART::Exceptions::NotFound.new("Repository not found: '#{repo_owner}/#{repo_name}'")
+      raise ART::Exceptions::NotFound.new(
+        "Repository not found: <https://github.com/#{repo_owner}/#{repo_name}>\n" +
+        "If this is your private repository, access it by authorizing from the home page."
+      )
     end
     result
   end
@@ -106,6 +109,16 @@ record RepoInstallation,
       {GitHubApp.token(FALLBACK_INSTALL_ID), nil}
     end
   end
+end
+
+private def github_run_link(repo_owner : String, repo_name : String, run_id : Int64) : String
+  "https://github.com/#{repo_owner}/#{repo_name}/actions/runs/#{run_id}#artifacts"
+end
+
+private def github_actions_link(repo_owner : String, repo_name : String, *, event : String, branch : String) : String
+  "https://github.com/#{repo_owner}/#{repo_name}/actions?" + HTTP::Params.encode({
+    query: "event:#{event} is:success branch:#{branch}",
+  })
 end
 
 HTML_HEADERS = HTTP::Headers{"Content-Type" => MIME.from_extension(".html")}
@@ -260,7 +273,11 @@ class DashboardController < ART::Controller
       raise e unless e.status_code.in?(401, 404)
     end
     if !artifacts || artifacts.empty?
-      raise ART::Exceptions::NotFound.new("No artifacts found for workflow '#{workflow}' and branch '#{branch}'")
+      gh_link = github_run_link(repo_owner, repo_name, run.id)
+      raise ART::Exceptions::NotFound.new(
+        "No artifacts found for workflow '#{workflow}' and branch '#{branch}'.\n" +
+        "Check on GitHub: <#{gh_link}>"
+      )
     end
 
     title = {"Repository #{repo_owner}/#{repo_name}", "Workflow #{workflow} | Branch #{branch}"}
@@ -284,7 +301,11 @@ private def get_latest_run(repo_owner : String, repo_name : String, workflow : S
         WorkflowRuns.for_workflow(repo_owner, repo_name, workflow, branch: branch, event: {{event[0]}}, token: token, max_items: 1, expires_in: {{event[1]}}.minutes)
       rescue e
         if e.is_a?(Halite::Exception::ClientError) && e.status_code.in?(401, 404)
-          e = ART::Exceptions::NotFound.new("Repository '#{repo_owner}/#{repo_name}' or workflow '#{workflow}' not found")
+          gh_link = "https://github.com/#{repo_owner}/#{repo_name}/tree/#{branch}/.github/workflows"
+          e = ART::Exceptions::NotFound.new(
+            "Repository '#{repo_owner}/#{repo_name}' or workflow '#{workflow}' not found.\n" +
+            "Check on GitHub: <#{gh_link}>"
+          )
         end
         e
       end
@@ -307,7 +328,13 @@ private def get_latest_run(repo_owner : String, repo_name : String, workflow : S
     end
   end
   if runs.empty?
-    raise exc || ART::Exceptions::NotFound.new("No successful runs found for workflow '#{workflow}' and branch '#{branch}'")
+    raise exc || begin
+      gh_link = github_actions_link(repo_owner, repo_name, event: "push", branch: branch)
+      ART::Exceptions::NotFound.new(
+        "No successful runs found for workflow '#{workflow}' and branch '#{branch}'.\n" +
+        "Check on GitHub: <#{gh_link}>"
+      )
+    end
   end
   runs.max_by &.updated_at
 end
@@ -332,9 +359,10 @@ class ArtifactsController < ART::Controller
 
     result = by_run(repo_owner, repo_name, run.id, artifact, run.check_suite_url.rpartition("/").last.to_i64?, h)
     result.title = {"Repository #{repo_owner}/#{repo_name}", "Workflow #{workflow} | Branch #{branch} | Artifact #{artifact}"}
-    result.links << Link.new("https://github.com/#{repo_owner}/#{repo_name}/actions?" + HTTP::Params.encode({
-      query: "event:#{run.event} is:success branch:#{branch}",
-    }), "GitHub: browse workflow runs on branch '#{branch}'", ext: true)
+    result.links << Link.new(
+      github_actions_link(repo_owner, repo_name, event: run.event, branch: branch),
+      "GitHub: browse workflow runs on branch '#{branch}'", ext: true
+    )
     link = generate_url("by_branch", :absolute_url, repo_owner: repo_owner, repo_name: repo_name, workflow: workflow.rchop(".yml"), branch: branch, artifact: artifact)
     result.links << Link.new("#{link}#{"?h=#{h}" if h}", result.title[1], zip: "#{link}.zip#{"?h=#{h}" if h}")
     return result
@@ -345,22 +373,27 @@ class ArtifactsController < ART::Controller
   def by_run(repo_owner : String, repo_name : String, run_id : Int64, artifact : String, check_suite_id : Int64?, h : String?) : ArtifactsController::Result
     token, h = RepoInstallation.verified_token(repo_owner, repo_name, h: h)
 
+    gh_link = github_run_link(repo_owner, repo_name, run_id)
     artifacts = begin
       Artifacts.for_run(repo_owner, repo_name, run_id, token, expires_in: 3.hours)
     rescue e : Halite::Exception::ClientError
       if e.status_code.in?(401, 404)
-        raise ART::Exceptions::NotFound.new("No artifacts found for run ##{run_id}")
+        raise ART::Exceptions::NotFound.new(
+          "No artifacts found for run ##{run_id}.\nCheck on GitHub: <#{gh_link}>"
+        )
       end
       raise e
     end
     art = artifacts.find { |a| a.name == artifact }
-    raise ART::Exceptions::NotFound.new("Artifact '#{artifact}' not found for run ##{run_id}") if !art
+    raise ART::Exceptions::NotFound.new(
+      "Artifact '#{artifact}' not found for run ##{run_id}.\nCheck on GitHub: <#{gh_link}>"
+    ) if !art
     repo_owner, repo_name = art.repository.owner, art.repository.name
 
     result = by_artifact(repo_owner, repo_name, art.id, check_suite_id, h)
     result.title = {"Repository #{repo_owner}/#{repo_name}", "Run ##{run_id} | Artifact #{artifact}"}
     result.links << Link.new(
-      "https://github.com/#{repo_owner}/#{repo_name}/actions/runs/#{run_id}",
+      github_run_link(repo_owner, repo_name, run_id),
       "GitHub: view run ##{run_id}", ext: true
     )
     # link = generate_url("by_run", repo_owner: repo_owner, repo_name: repo_name, run_id: run_id, artifact: artifact)
@@ -372,13 +405,22 @@ class ArtifactsController < ART::Controller
   @[ART::Get("/:repo_owner/:repo_name/actions/artifacts/:artifact_id", name: "by_artifact")]
   def by_artifact(repo_owner : String, repo_name : String, artifact_id : Int64, check_suite_id : Int64?, h : String?) : ArtifactsController::Result
     token, h = RepoInstallation.verified_token(repo_owner, repo_name, h: h)
+
+    artifact_gh_link = "https://github.com/#{repo_owner}/#{repo_name}/suites/#{check_suite_id}/artifacts/#{artifact_id}" if check_suite_id
+    gh_link = artifact_gh_link || "https://api.github.com/repos/#{repo_owner}/#{repo_name}/actions/artifacts/#{artifact_id}"
     tmp_link = begin
       Artifact.zip_by_id(repo_owner, repo_name, artifact_id, token: token)
     rescue e : GitHubArtifactDownloadError
-      raise ART::Exceptions::NotFound.new("GitHub produced an error for the download of artifact ##{artifact_id}. Usually this means that the artifact has expired (>90 days).")
+      raise ART::Exceptions::NotFound.new(
+        "GitHub produced an error for the download of artifact ##{artifact_id}.\n" +
+        "Usually this means that the artifact has expired (>90 days).\n" +
+        "Check on GitHub: <#{gh_link}>"
+      )
     rescue e : Halite::Exception::ClientError
       if e.status_code.in?(401, 404)
-        raise ART::Exceptions::NotFound.new("Artifact ##{artifact_id} not found")
+        raise ART::Exceptions::NotFound.new(
+          "Artifact ##{artifact_id} not found.\nCheck on GitHub: <#{gh_link}>"
+        )
       end
       raise e
     end
@@ -386,9 +428,9 @@ class ArtifactsController < ART::Controller
     result.title = {"Repository #{repo_owner}/#{repo_name}", "Artifact ##{artifact_id}"}
     result.links << Link.new(tmp_link, "Ephemeral direct download link (expires in <1 minute)")
     result.links << Link.new(
-      "https://github.com/#{repo_owner}/#{repo_name}/suites/#{check_suite_id}/artifacts/#{artifact_id}",
+      artifact_gh_link,
       "GitHub: direct download of artifact ##{artifact_id} (requires GitHub login)", ext: true
-    ) if check_suite_id
+    ) if artifact_gh_link
     link = generate_url("by_artifact", :absolute_url, repo_owner: repo_owner, repo_name: repo_name, artifact_id: artifact_id)
     result.links << Link.new("#{link}#{"?h=#{h}" if h}", result.title[1], zip: "#{link}.zip#{"?h=#{h}" if h}")
     return result
