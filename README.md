@@ -4,7 +4,7 @@
 
 This service lets you get a shareable link to download a build artifact from the latest successful GitHub Actions build of a repository.
 
-Any public repository is accessible by default.
+Any public repository is accessible by default and **visitors don't need to log in**.
 
 If you'll be publishing a link to your own repository's artifacts, please install [the GitHub App][app] anyway, so that downloads for your repositories don't share the global API rate limit. The throttling will likely become very bad over time.
 
