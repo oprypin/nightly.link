@@ -1,8 +1,9 @@
 require "http"
 require "ecr"
+require "log"
 
 require "halite"
-require "athena"
+require "retour/http"
 require "sqlite3"
 require "future"
 
@@ -17,6 +18,11 @@ GITHUB_PEM_FILENAME  = ENV["GITHUB_PEM_FILENAME"]
 APP_SECRET           = ENV["APP_SECRET"]
 FALLBACK_INSTALL_ID  = ENV["FALLBACK_INSTALLATION_ID"].to_i64
 PORT                 = ENV["PORT"].to_i
+URL                  = Path.posix(ENV["URL"]? || "https://nightly.link/")
+
+def abs_url(path : String) : String
+  URL.join(path).to_s
+end
 
 GitHubApp = GitHubAppAuth.new(
   app_id: GITHUB_APP_ID,
@@ -94,7 +100,7 @@ record RepoInstallation,
     result = nil
     unless public_repos.any? { |r| r.downcase == repo_name.downcase } ||
            h && private_repos.includes?(repo_name) && h == (result = password(repo_name))
-      raise ART::Exceptions::NotFound.new(
+      raise HTTPException.new(:NotFound,
         "Repository not found: <https://github.com/#{repo_owner}/#{repo_name}>\n" +
         "If this is your private repository, access it by authorizing from the home page."
       )
@@ -122,9 +128,9 @@ private def github_actions_link(repo_owner : String, repo_name : String, *, even
   })
 end
 
-HTML_HEADERS = HTTP::Headers{"Content-Type" => MIME.from_extension(".html")}
+class NightlyLink
+  include Retour::HTTPRouter
 
-class DashboardController < ART::Controller
   RECONFIGURE_URL = "https://github.com/apps/#{GITHUB_APP_NAME}/installations/new"
   AUTH_URL        = "https://github.com/login/oauth/authorize?" + HTTP::Params.encode({
     client_id: GITHUB_CLIENT_ID, scope: "",
@@ -148,21 +154,21 @@ class DashboardController < ART::Controller
     "https://github.com/#{repo_owner}/#{repo_name}/blob/$branch/.github/workflows/$workflow.yml"
   end
 
-  @[ART::Get("/", name: "index")]
-  def index : ART::Response
+  @[Retour::Get("/")]
+  def index(ctx)
     messages = Tuple.new
     url = h = nil
-    canonical = generate_url("index", reference_type: :absolute_url)
-    ART::StreamedResponse.new(headers: HTML_HEADERS) do |io|
-      ECR.embed("templates/head.html", io)
-      io << "<title>nightly.link</title>"
-      ECR.embed("README.html", io)
-    end
+    canonical = abs_url(NightlyLink.gen_index)
+
+    ctx.response.content_type = "text/html"
+    ECR.embed("templates/head.html", ctx.response)
+    ctx.response << "<title>nightly.link</title>"
+    ECR.embed("README.html", ctx.response)
   end
 
-  @[ART::Post("/", name: "index_form")]
-  def index_form(request : HTTP::Request) : ART::Response
-    if (body = request.body)
+  @[Retour::Post("/")]
+  def index_form(ctx)
+    if (body = ctx.request.body)
       data = HTTP::Params.parse(body.gets_to_end)
       url = data["url"]?
       h = data["h"]?
@@ -175,26 +181,26 @@ class DashboardController < ART::Controller
         if branch =~ /^[0-9a-fA-F]{32,}$/
           messages.unshift("Make sure you're on a branch (such as 'master'), not a commit (which '#{$0}' seems to be).")
         else
-          link = generate_url("dash_by_branch", :absolute_url, repo_owner: repo_owner, repo_name: repo_name, workflow: workflow.rchop(".yml"), branch: branch, h: h)
-          return ART::RedirectResponse.new(link)
+          link = abs_url(NightlyLink.gen_dash_by_branch(repo_owner: repo_owner, repo_name: repo_name, workflow: workflow.rchop(".yml"), branch: branch))
+          link += "?h=#{h}" if h
+          raise HTTPException.redirect(link)
         end
       end
       messages.unshift("Did not detect a link to a GitHub workflow file.")
     end
 
-    canonical = generate_url("index_form", reference_type: :absolute_url)
-    ART::StreamedResponse.new(headers: HTML_HEADERS) do |io|
-      ECR.embed("templates/head.html", io)
-      io << "<title>nightly.link</title>"
-      ECR.embed("README.html", io)
-    end
+    canonical = abs_url(NightlyLink.gen_index_form)
+    ctx.response.content_type = "text/html"
+    ECR.embed("templates/head.html", ctx.response)
+    ctx.response << "<title>nightly.link</title>"
+    ECR.embed("README.html", ctx.response)
   end
 
-  @[ART::QueryParam("code")]
-  @[ART::Get("/dashboard", name: "dashboard")]
-  def do_auth(code : String? = nil) : ART::Response
+  @[Retour::Post("/dashboard")]
+  def dashboard(ctx)
+    code = ctx.request.query_params["code"]?
     if !code
-      return ART::RedirectResponse.new(AUTH_URL, headers: HTTP::Headers{
+      raise HTTPException.redirect(AUTH_URL, headers: HTTP::Headers{
         "X-Robots-Tag" => "noindex",
       })
     end
@@ -209,7 +215,7 @@ class DashboardController < ART::Controller
       token = UserToken.new(resp["access_token"])
     rescue e
       if resp["error"]? == "bad_verification_code"
-        return ART::RedirectResponse.new("/dashboard")
+        raise HTTPException.redirect("/dashboard")
       end
       raise e
     end
@@ -221,31 +227,29 @@ class DashboardController < ART::Controller
     end
     installations = futures.map(&.get)
 
-    canonical = generate_url("dashboard", reference_type: :absolute_url)
-    return ART::StreamedResponse.new(headers: HTTP::Headers{
-      "Content-Type" => MIME.from_extension(".html"),
-      "X-Robots-Tag" => "noindex",
-    }) do |io|
-      ECR.embed("templates/head.html", io)
-      ECR.embed("templates/dashboard.html", io)
-    end
+    ctx.response.content_type = "text/html"
+    ctx.response.headers["X-Robots-Tag"] = "noindex"
+
+    canonical = abs_url(NightlyLink.gen_dashboard)
+    ECR.embed("templates/head.html", ctx.response)
+    ECR.embed("templates/dashboard.html", ctx.response)
   end
 
-  @[ART::QueryParam("installation_id")]
-  @[ART::Get("/setup")]
-  def do_setup(installation_id : InstallationId) : ART::Response
+  @[Retour::Get("/setup")]
+  def do_setup(ctx)
+    installation_id = ctx.request.query_params["installation_id"].to_i64 rescue raise HTTPException.new(:BadRequest)
     spawn do
       inst = Installation.for_id(installation_id, GitHubApp.jwt)
       RepoInstallation.refresh(inst)
     end
-    ART::RedirectResponse.new("/")
+    raise HTTPException.redirect("/")
   end
 
   record Link, url : String, title : String
 
-  @[ART::QueryParam("h")]
-  @[ART::Get("/:repo_owner/:repo_name/workflows/:workflow/:branch", name: "dash_by_branch")]
-  def by_branch(repo_owner : String, repo_name : String, workflow : String, branch : String, h : String?) : ART::Response
+  @[Retour::Get("/{repo_owner}/{repo_name}/workflows/{workflow}/{branch}")]
+  def dash_by_branch(ctx, repo_owner : String, repo_name : String, workflow : String, branch : String)
+    h = ctx.request.query_params["h"]?
     token, h = RepoInstallation.verified_token(repo_owner, repo_name, h: h)
     unless workflow.to_i? || workflow.ends_with?(".yml") || workflow.ends_with?(".yaml")
       workflow += ".yml"
@@ -264,7 +268,7 @@ class DashboardController < ART::Controller
     end
     if !artifacts || artifacts.empty?
       gh_link = github_run_link(repo_owner, repo_name, run.id)
-      raise ART::Exceptions::NotFound.new(
+      raise HTTPException.new(:NotFound,
         "No artifacts found for workflow '#{workflow}' and branch '#{branch}'.\n" +
         "Check on GitHub: <#{gh_link}>"
       )
@@ -272,56 +276,57 @@ class DashboardController < ART::Controller
 
     title = {"Repository #{repo_owner}/#{repo_name}", "Workflow #{workflow} | Branch #{branch}"}
     links = artifacts.map do |art|
-      link = generate_url("by_branch", :absolute_url, repo_owner: repo_owner, repo_name: repo_name, workflow: workflow.rchop(".yml"), branch: branch, artifact: art.name, h: h)
+      link = abs_url(NightlyLink.gen_by_branch(repo_owner: repo_owner, repo_name: repo_name, workflow: workflow.rchop(".yml"), branch: branch, artifact: art.name))
+      link += "?h=#{h}" if h
       Link.new(link, art.name)
     end
-    canonical = generate_url("dash_by_branch", :absolute_url, repo_owner: repo_owner, repo_name: repo_name, workflow: workflow.rchop(".yml"), branch: branch, h: h)
-    return ART::StreamedResponse.new(headers: HTML_HEADERS) do |io|
-      ECR.embed("templates/head.html", io)
-      ECR.embed("templates/artifact_list.html", io)
-    end
-  end
-end
+    canonical = abs_url(NightlyLink.gen_dash_by_branch(repo_owner: repo_owner, repo_name: repo_name, workflow: workflow.rchop(".yml"), branch: branch))
+    canonical += "?h=#{h}" if h
 
-private def get_latest_run(repo_owner : String, repo_name : String, workflow : String, branch : String, token : InstallationToken)
-  futures = [{"push", 5.minutes}, {"schedule", 1.hour}].map do |(event, expires_in)|
-    future do
-      begin
-        WorkflowRuns.for_workflow(repo_owner, repo_name, workflow, branch: branch, event: event, token: token, max_items: 1, expires_in: expires_in)
-      rescue e : Halite::Exception::ClientError
-        if e.status_code.in?(401, 404)
-          gh_link = "https://github.com/#{repo_owner}/#{repo_name}/tree/#{branch}/.github/workflows"
-          raise ART::Exceptions::NotFound.new(
-            "Repository '#{repo_owner}/#{repo_name}' or workflow '#{workflow}' not found.\n" +
-            "Check on GitHub: <#{gh_link}>"
-          )
+    ctx.response.content_type = "text/html"
+    ECR.embed("templates/head.html", ctx.response)
+    ECR.embed("templates/artifact_list.html", ctx.response)
+  end
+
+  private def get_latest_run(repo_owner : String, repo_name : String, workflow : String, branch : String, token : InstallationToken)
+    futures = [{"push", 5.minutes}, {"schedule", 1.hour}].map do |(event, expires_in)|
+      future do
+        begin
+          WorkflowRuns.for_workflow(repo_owner, repo_name, workflow, branch: branch, event: event, token: token, max_items: 1, expires_in: expires_in)
+        rescue e : Halite::Exception::ClientError
+          if e.status_code.in?(401, 404)
+            gh_link = "https://github.com/#{repo_owner}/#{repo_name}/tree/#{branch}/.github/workflows"
+            raise HTTPException.new(:NotFound,
+              "Repository '#{repo_owner}/#{repo_name}' or workflow '#{workflow}' not found.\n" +
+              "Check on GitHub: <#{gh_link}>"
+            )
+          end
+          raise e
         end
-        raise e
       end
     end
+    runs = futures.map(&.get.first?).compact
+    if runs.empty?
+      gh_link = github_actions_link(repo_owner, repo_name, event: "push", branch: branch)
+      raise HTTPException.new(:NotFound,
+        "No successful runs found for workflow '#{workflow}' and branch '#{branch}'.\n" +
+        "Check on GitHub: <#{gh_link}>"
+      )
+    end
+    runs.max_by &.updated_at
   end
-  runs = futures.map(&.get.first?).compact
-  if runs.empty?
-    gh_link = github_actions_link(repo_owner, repo_name, event: "push", branch: branch)
-    raise ART::Exceptions::NotFound.new(
-      "No successful runs found for workflow '#{workflow}' and branch '#{branch}'.\n" +
-      "Check on GitHub: <#{gh_link}>"
-    )
-  end
-  runs.max_by &.updated_at
-end
 
-class ArtifactsController < ART::Controller
-  record Link, url : String, title : String? = nil, ext : Bool = false, zip : String? = nil
+  record ArtifactLink, url : String, title : String? = nil, ext : Bool = false, zip : String? = nil
 
   struct Result
-    property links = Array(Link).new
+    property links = Array(ArtifactLink).new
     property title : {String, String} = {"", ""}
   end
 
-  @[ART::QueryParam("h")]
-  @[ART::Get("/:repo_owner/:repo_name/workflows/:workflow/:branch/:artifact", name: "by_branch")]
-  def by_branch(repo_owner : String, repo_name : String, workflow : String, branch : String, artifact : String, h : String?) : ArtifactsController::Result
+  @[Retour::Get("/{repo_owner}/{repo_name}/workflows/{workflow}/{branch}/{artifact}{zip:\\.zip}")]
+  @[Retour::Get("/{repo_owner}/{repo_name}/workflows/{workflow}/{branch}/{artifact}")]
+  def by_branch(ctx, repo_owner : String, repo_name : String, workflow : String, branch : String, artifact : String, h : String? = nil, zip : String? = nil)
+    h = ctx.request.query_params["h"]? if ctx
     token, h = RepoInstallation.verified_token(repo_owner, repo_name, h: h)
     unless workflow.to_i? || workflow.ends_with?(".yml") || workflow.ends_with?(".yaml")
       workflow += ".yml"
@@ -329,20 +334,25 @@ class ArtifactsController < ART::Controller
     run = get_latest_run(repo_owner, repo_name, workflow, branch, token)
     repo_owner, repo_name = run.repository.owner, run.repository.name
 
-    result = by_run(repo_owner, repo_name, run.id, artifact, run.check_suite_url.rpartition("/").last.to_i64?, h)
+    result = by_run(nil, repo_owner, repo_name, run.id, artifact, run.check_suite_url.rpartition("/").last.to_i64?, h)
     result.title = {"Repository #{repo_owner}/#{repo_name}", "Workflow #{workflow} | Branch #{branch} | Artifact #{artifact}"}
-    result.links << Link.new(
+    result.links << ArtifactLink.new(
       github_actions_link(repo_owner, repo_name, event: run.event, branch: branch),
       "GitHub: browse workflow runs on branch '#{branch}'", ext: true
     )
-    link = generate_url("by_branch", :absolute_url, repo_owner: repo_owner, repo_name: repo_name, workflow: workflow.rchop(".yml"), branch: branch, artifact: artifact)
-    result.links << Link.new("#{link}#{"?h=#{h}" if h}", result.title[1], zip: "#{link}.zip#{"?h=#{h}" if h}")
+    link = abs_url(NightlyLink.gen_by_branch(repo_owner: repo_owner, repo_name: repo_name, workflow: workflow.rchop(".yml"), branch: branch, artifact: artifact))
+    result.links << ArtifactLink.new("#{link}#{"?h=#{h}" if h}", result.title[1], zip: "#{link}.zip#{"?h=#{h}" if h}")
+
+    return artifact_page(ctx, result, !!zip) if ctx
     return result
   end
 
-  # @[ART::QueryParam("h")]
-  # @[ART::Get("/:repo_owner/:repo_name/actions/runs/:run_id/:artifact")]
-  def by_run(repo_owner : String, repo_name : String, run_id : Int64, artifact : String, check_suite_id : Int64?, h : String?) : ArtifactsController::Result
+  # @[Retour::Get("/{repo_owner}/{repo_name}/{actions}/{runs}/{run_id}/{artifact}{zip:\\.zip}")]
+  # @[Retour::Get("/{repo_owner}/{repo_name}/{actions}/{runs}/{run_id}/{artifact}")]
+  def by_run(ctx, repo_owner : String, repo_name : String, run_id : Int64 | String, artifact : String, check_suite_id : Int64? | String, h : String? = nil, zip : String? = nil)
+    run_id = run_id.to_i64 rescue raise HTTPException.new(:NotFound)
+    check_suite_id = check_suite_id && check_suite_id.to_i64 rescue raise HTTPException.new(:NotFound)
+    h = ctx.request.query_params["h"]? if ctx
     token, h = RepoInstallation.verified_token(repo_owner, repo_name, h: h)
 
     gh_link = github_run_link(repo_owner, repo_name, run_id)
@@ -350,32 +360,38 @@ class ArtifactsController < ART::Controller
       Artifacts.for_run(repo_owner, repo_name, run_id, token, expires_in: 3.hours)
     rescue e : Halite::Exception::ClientError
       if e.status_code.in?(401, 404)
-        raise ART::Exceptions::NotFound.new(
+        raise HTTPException.new(:NotFound,
           "No artifacts found for run ##{run_id}.\nCheck on GitHub: <#{gh_link}>"
         )
       end
       raise e
     end
     art = artifacts.find { |a| a.name == artifact }
-    raise ART::Exceptions::NotFound.new(
+    raise HTTPException.new(:NotFound,
       "Artifact '#{artifact}' not found for run ##{run_id}.\nCheck on GitHub: <#{gh_link}>"
     ) if !art
     repo_owner, repo_name = art.repository.owner, art.repository.name
 
-    result = by_artifact(repo_owner, repo_name, art.id, check_suite_id, h)
+    result = by_artifact(nil, repo_owner, repo_name, art.id, check_suite_id, h)
     result.title = {"Repository #{repo_owner}/#{repo_name}", "Run ##{run_id} | Artifact #{artifact}"}
-    result.links << Link.new(
+    result.links << ArtifactLink.new(
       github_run_link(repo_owner, repo_name, run_id),
       "GitHub: view run ##{run_id}", ext: true
     )
-    # link = generate_url("by_run", repo_owner: repo_owner, repo_name: repo_name, run_id: run_id, artifact: artifact)
-    # result.links << Link.new("#{link}#{"?h=#{h}" if h}", result.title[1], zip: "#{link}.zip#{"?h=#{h}" if h}")
+    # link = NightlyLink.gen_by_run(repo_owner: repo_owner, repo_name: repo_name, run_id: run_id, artifact: artifact)
+    # result.links << ArtifactLink.new("#{link}#{"?h=#{h}" if h}", result.title[1], zip: "#{link}.zip#{"?h=#{h}" if h}")
+    return artifact_page(ctx, result, !!zip) if ctx
     return result
   end
 
-  @[ART::QueryParam("h")]
-  @[ART::Get("/:repo_owner/:repo_name/actions/artifacts/:artifact_id", name: "by_artifact")]
-  def by_artifact(repo_owner : String, repo_name : String, artifact_id : Int64, check_suite_id : Int64?, h : String?) : ArtifactsController::Result
+  @[Retour::Get("/{repo_owner}/{repo_name}/actions/artifacts/{artifact_id:[0-9]+}{zip:\\.zip}")]
+  @[Retour::Get("/{repo_owner}/{repo_name}/actions/artifacts/{artifact_id:[0-9]+}")]
+  def by_artifact(ctx, repo_owner : String, repo_name : String, artifact_id : String | Int64, check_suite_id : String | Int64? = nil, h : String? = nil, zip : String? = nil)
+    artifact_id = artifact_id.to_i64 rescue raise HTTPException.new(:NotFound)
+    if check_suite_id
+      check_suite_id = check_suite_id.to_i64 rescue raise HTTPException.new(:NotFound)
+    end
+    h = ctx.request.query_params["h"]? if ctx
     token, h = RepoInstallation.verified_token(repo_owner, repo_name, h: h)
 
     artifact_gh_link = "https://github.com/#{repo_owner}/#{repo_name}/suites/#{check_suite_id}/artifacts/#{artifact_id}" if check_suite_id
@@ -383,14 +399,14 @@ class ArtifactsController < ART::Controller
     tmp_link = begin
       Artifact.zip_by_id(repo_owner, repo_name, artifact_id, token: token)
     rescue e : GitHubArtifactDownloadError
-      raise ART::Exceptions::NotFound.new(
+      raise HTTPException.new(:NotFound,
         "GitHub produced an error for the download of artifact ##{artifact_id}.\n" +
         "Usually this means that the artifact has expired (>90 days).\n" +
         "Check on GitHub: <#{gh_link}>"
       )
     rescue e : Halite::Exception::ClientError
       if e.status_code.in?(401, 404)
-        raise ART::Exceptions::NotFound.new(
+        raise HTTPException.new(:NotFound,
           "Artifact ##{artifact_id} not found.\nCheck on GitHub: <#{gh_link}>"
         )
       end
@@ -398,61 +414,32 @@ class ArtifactsController < ART::Controller
     end
     result = Result.new
     result.title = {"Repository #{repo_owner}/#{repo_name}", "Artifact ##{artifact_id}"}
-    result.links << Link.new(tmp_link, "Ephemeral direct download link (expires in <1 minute)")
-    result.links << Link.new(
+    result.links << ArtifactLink.new(tmp_link, "Ephemeral direct download link (expires in <1 minute)")
+    result.links << ArtifactLink.new(
       artifact_gh_link,
       "GitHub: direct download of artifact ##{artifact_id} (requires GitHub login)", ext: true
     ) if artifact_gh_link
-    link = generate_url("by_artifact", :absolute_url, repo_owner: repo_owner, repo_name: repo_name, artifact_id: artifact_id)
-    result.links << Link.new("#{link}#{"?h=#{h}" if h}", result.title[1], zip: "#{link}.zip#{"?h=#{h}" if h}")
+    link = abs_url(NightlyLink.gen_by_artifact(repo_owner: repo_owner, repo_name: repo_name, artifact_id: artifact_id))
+    result.links << ArtifactLink.new("#{link}#{"?h=#{h}" if h}", result.title[1], zip: "#{link}.zip#{"?h=#{h}" if h}")
+
+    return artifact_page(ctx, result, !!zip) if ctx
     return result
   end
 
-  @[ADI::Register]
-  class ResultListener
-    include AED::EventListenerInterface
+  def artifact_page(ctx, result : Result, zip : Bool)
+    if zip
+      raise HTTPException.redirect(result.links.first.url)
+    else
+      title = result.title
+      links = result.links.reverse!
+      canonical = links.first.url
 
-    def initialize
-      @zip = false
-    end
-
-    def self.subscribed_events : AED::SubscribedEvents
-      AED::SubscribedEvents{ART::Events::View => 100, ART::Events::Request => 100, ART::Events::Response => 100}
-    end
-
-    def call(event : ART::Events::Request, dispatcher : AED::EventDispatcherInterface) : Nil
-      if (path = event.request.path.rchop?(".zip"))
-        event.request.path = path
-        @zip = true
-      end
-    end
-
-    def call(event : ART::Events::View, dispatcher : AED::EventDispatcherInterface) : Nil
-      if (result = event.action_result.as?(Result))
-        if @zip
-          event.response = ART::RedirectResponse.new(result.links.first.url)
-          @zip = false
-        else
-          title = result.title
-          links = result.links.reverse!
-          canonical = links.first.url
-          event.response = ART::StreamedResponse.new(headers: HTML_HEADERS) do |io|
-            ECR.embed("templates/head.html", io)
-            ECR.embed("templates/artifact.html", io)
-          end
-        end
-      end
-    end
-
-    def call(event : ART::Events::Response, dispatcher : AED::EventDispatcherInterface) : Nil
-      if @zip
-        raise ART::Exceptions::NotFound.new("")
-      end
+      ctx.response.content_type = "text/html"
+      ECR.embed("templates/head.html", ctx.response)
+      ECR.embed("templates/artifact.html", ctx.response)
     end
   end
-end
 
-class StaticController < ART::Controller
   {% for path, i in ["github-markdown.min.css", "logo.svg"] %}
     {% ext = path.split(".")[-1] %}
     {% headers = "#{ext.upcase.id}_HEADERS".id %}
@@ -461,40 +448,49 @@ class StaticController < ART::Controller
       "Cache-Control" => "max-age=#{100.days.total_seconds}",
     }
 
-    @[ART::Get(path: {{"/#{path.id}"}})]
-    def static{{i}} : ART::Response
-      ART::Response.new(
-        {{read_file("#{__DIR__}/#{path.id}")}},
-        headers: {{headers}}
-      )
+    @[Retour::Get({{"/#{path.id}"}})]
+    def static{{i}}(ctx)
+      ctx.response.headers.merge!({{headers}})
+      ctx.response << {{read_file("#{__DIR__}/#{path.id}")}}
     end
   {% end %}
 end
 
-struct ART::Listeners::Error
-  protected def log_exception(exception : Exception, &block : -> String) : Nil
-    if exception.is_a? ART::Exceptions::NotFound
-      LOGGER.warn { "Not found: #{exception.to_s.partition('\n').first}" }
-    else
-      previous_def(exception, &block)
-    end
+class HTTPException < Exception
+  getter status : HTTP::Status
+  property headers : HTTP::Headers
+
+  def initialize(@status : HTTP::Status, message : String = "", @headers : HTTP::Headers = HTTP::Headers.new)
+    super(message)
+  end
+
+  def self.redirect(location : String, status : HTTP::Status = :Found, headers : HTTP::Headers = HTTP::Headers.new)
+    headers["Location"] = location
+    HTTPException.new(status, headers: headers)
   end
 end
 
-struct Athena::Routing::ErrorRenderer
-  def render(exception : ::Exception) : ART::Response
-    if !exception.is_a? ART::Exceptions::HTTPException
-      exception = ART::Exceptions::HTTPException.new(:InternalServerError, "")
+app = NightlyLink.new
+server = HTTP::Server.new([
+  HTTP::LogHandler.new,
+]) do |ctx|
+  begin
+    app.call(ctx, ctx)
+  rescue exception
+    if exception.is_a?(Retour::NotFound)
+      exception = HTTPException.new(:NotFound, exception.to_s)
+    elsif !exception.is_a?(HTTPException)
+      Log.error(exception: exception) { }
+      exception = HTTPException.new(:InternalServerError)
     end
-    status = exception.status
-    headers = exception.headers
-    headers["Content-Type"] = "text/html"
+    ctx.response.content_type = "text/html"
+    ctx.response.status = status = exception.status
+    ctx.response.headers.merge!(exception.headers)
+    next if status.redirection?
     canonical = nil
-    ART::StreamedResponse.new(headers: headers) do |io|
-      ECR.embed("templates/head.html", io)
-      ECR.embed("templates/error.html", io)
-    end
+    ECR.embed("templates/head.html", ctx.response)
+    ECR.embed("templates/error.html", ctx.response)
   end
 end
-
-ART.run(host: "127.0.0.1", port: PORT)
+server.bind_tcp("127.0.0.1", PORT)
+server.listen
