@@ -133,7 +133,7 @@ class NightlyLink
 
   RECONFIGURE_URL = "https://github.com/apps/#{GITHUB_APP_NAME}/installations/new"
   AUTH_URL        = "https://github.com/login/oauth/authorize?" + HTTP::Params.encode({
-    client_id: GITHUB_CLIENT_ID, scope: "",
+    client_id: GITHUB_CLIENT_ID, scope: "", redirect_uri: abs_url(NightlyLink.gen_dashboard),
   })
 
   WORKFLOW_EXAMPLES = [
