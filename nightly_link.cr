@@ -366,7 +366,7 @@ class NightlyLink
       end
       raise e
     end
-    art = artifacts.find { |a| a.name == artifact }
+    art = artifacts.find { |a| a.name == artifact } || artifacts.find { |a| a.name == "#{artifact}.zip" }
     raise HTTPException.new(:NotFound,
       "Artifact '#{artifact}' not found for run ##{run_id}.\nCheck on GitHub: <#{gh_link}>"
     ) if !art
