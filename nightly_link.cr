@@ -348,7 +348,7 @@ class NightlyLink
     result.title = {"Repository #{repo_owner}/#{repo_name}", "Workflow #{workflow} | Branch #{branch} | Artifact #{artifact}"}
     result.links << ArtifactLink.new(
       github_actions_link(repo_owner, repo_name, event: run.event, branch: branch),
-      "GitHub: browse workflow runs on branch '#{branch}'", ext: true
+      "Browse workflow runs on branch '#{branch}'", ext: true
     )
     link = abs_url(NightlyLink.gen_by_branch(repo_owner: repo_owner, repo_name: repo_name, workflow: workflow.rchop(".yml"), branch: branch, artifact: artifact))
     result.links << ArtifactLink.new("#{link}#{"?h=#{h}" if h}", result.title[1], zip: "#{link}.zip#{"?h=#{h}" if h}")
@@ -357,9 +357,9 @@ class NightlyLink
     return result
   end
 
-  # @[Retour::Get("/{repo_owner}/{repo_name}/{actions}/{runs}/{run_id:[0-9]+}/{artifact}{zip:\\.zip}")]
-  # @[Retour::Get("/{repo_owner}/{repo_name}/{actions}/{runs}/{run_id:[0-9]+}/{artifact}")]
-  def by_run(ctx, repo_owner : String, repo_name : String, run_id : Int64 | String, artifact : String, check_suite_id : Int64? | String, h : String? = nil, zip : String? = nil)
+  @[Retour::Get("/{repo_owner}/{repo_name}/actions/runs/{run_id:[0-9]+}/{artifact}{zip:\\.zip}")]
+  @[Retour::Get("/{repo_owner}/{repo_name}/actions/runs/{run_id:[0-9]+}/{artifact}")]
+  def by_run(ctx, repo_owner : String, repo_name : String, run_id : Int64 | String, artifact : String, check_suite_id : Int64? | String = nil, h : String? = nil, zip : String? = nil)
     run_id = run_id.to_i64 rescue raise HTTPException.new(:NotFound)
     check_suite_id = check_suite_id && check_suite_id.to_i64 rescue raise HTTPException.new(:NotFound)
     h = ctx.request.query_params["h"]? if ctx
@@ -385,11 +385,10 @@ class NightlyLink
     result = by_artifact(nil, repo_owner, repo_name, art.id, check_suite_id, h)
     result.title = {"Repository #{repo_owner}/#{repo_name}", "Run ##{run_id} | Artifact #{artifact}"}
     result.links << ArtifactLink.new(
-      github_run_link(repo_owner, repo_name, run_id),
-      "GitHub: view run ##{run_id}", ext: true
+      github_run_link(repo_owner, repo_name, run_id), "View run ##{run_id}", ext: true
     )
-    # link = NightlyLink.gen_by_run(repo_owner: repo_owner, repo_name: repo_name, run_id: run_id, artifact: artifact)
-    # result.links << ArtifactLink.new("#{link}#{"?h=#{h}" if h}", result.title[1], zip: "#{link}.zip#{"?h=#{h}" if h}")
+    link = abs_url(NightlyLink.gen_by_run(repo_owner: repo_owner, repo_name: repo_name, run_id: run_id, artifact: artifact))
+    result.links << ArtifactLink.new("#{link}#{"?h=#{h}" if h}", result.title[1], zip: "#{link}.zip#{"?h=#{h}" if h}")
     return artifact_page(ctx, result, !!zip) if ctx
     return result
   end
@@ -427,8 +426,7 @@ class NightlyLink
     result.title = {"Repository #{repo_owner}/#{repo_name}", "Artifact ##{artifact_id}"}
     result.links << ArtifactLink.new(tmp_link, "Ephemeral direct download link (expires in <1 minute)")
     result.links << ArtifactLink.new(
-      artifact_gh_link,
-      "GitHub: direct download of artifact ##{artifact_id} (requires GitHub login)", ext: true
+      artifact_gh_link, "Direct download of artifact ##{artifact_id} (requires GitHub login)", ext: true
     ) if artifact_gh_link
     link = abs_url(NightlyLink.gen_by_artifact(repo_owner: repo_owner, repo_name: repo_name, artifact_id: artifact_id))
     result.links << ArtifactLink.new("#{link}#{"?h=#{h}" if h}", result.title[1], zip: "#{link}.zip#{"?h=#{h}" if h}")

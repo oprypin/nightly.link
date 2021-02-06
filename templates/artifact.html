@@ -13,7 +13,7 @@
       <% if link.ext == ext %>
         <li>
           <% if (zip = link.zip) %>
-            <% if i == 0 %><b><% end %><a href="<%= HTML.escape(zip) %>"><%= HTML.escape(zip) %><% if i == 0 %></b><% end %></a> (direct download)
+            <% if i == 0 %><b><% end %><a href="<%= HTML.escape(zip) %>"><%= HTML.escape(zip) %><% if i == 0 %></b><% end %></a>
           <% else %>
             <a href="<%= HTML.escape(link.url) %>" rel="nofollow"<% if link.ext %> _target="blank"<% end %>><%= HTML.escape(link.title || link.url) %></a>
             <% if i == 0 %>(this page)<% end %>

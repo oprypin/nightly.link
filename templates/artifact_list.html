@@ -8,6 +8,7 @@
 <p>Choose one of the artifacts:</p>
 <ul>
   <% links.each do |link| %>
-    <li><a href="<%= HTML.escape(link.url) %>"><%= HTML.escape(link.title) %></a></li>
+    <li><b><a href="<%= HTML.escape(link.url) %>"><%= HTML.escape(link.title) %></a></b>:
+    <a href="<%= HTML.escape(link.url) %>.zip"><%= HTML.escape(link.url) %>.zip</a>
   <% end %>
 </ul>
