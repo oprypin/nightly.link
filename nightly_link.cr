@@ -196,7 +196,7 @@ class NightlyLink
     ECR.embed("README.html", ctx.response)
   end
 
-  @[Retour::Post("/dashboard")]
+  @[Retour::Get("/dashboard")]
   def dashboard(ctx)
     code = ctx.request.query_params["code"]?
     if !code
