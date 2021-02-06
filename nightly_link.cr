@@ -136,11 +136,17 @@ class NightlyLink
     client_id: GITHUB_CLIENT_ID, scope: "", redirect_uri: abs_url(NightlyLink.gen_dashboard),
   })
 
-  WORKFLOW_EXAMPLES = [
-    "https://github.com/actions/upload-artifact/blob/main/.github/workflows/test.yml",
-    "https://github.com/crystal-lang/crystal/blob/master/.github/workflows/win.yml",
-    "https://github.com/quassel/quassel/blob/master/.github/workflows/main.yml",
-  ]
+  WORKFLOW_EXAMPLES = {
+    "https://github.com/actions/upload-artifact/blob/main/.github/workflows/test.yml" => {
+      repo_owner: "actions", repo_name: "upload-artifact", workflow: "test", branch: "main", artifact: "artifact",
+    },
+    "https://github.com/crystal-lang/crystal/blob/master/.github/workflows/win.yml" => {
+      repo_owner: "crystal-lang", repo_name: "crystal", workflow: "win", branch: "master", artifact: "crystal",
+    },
+    "https://github.com/quassel/quassel/blob/master/.github/workflows/main.yml" => {
+      repo_owner: "quassel", repo_name: "quassel", workflow: "main", branch: "master", artifact: "Windows",
+    },
+  }.to_a
 
   def workflow_pattern(repo_owner : String, repo_name : String) : Regex
     %r(^https?://github.com/(#{repo_owner})/(#{repo_name})/(blob|tree|raw|blame|commits)/([^/]+)/\.github/workflows/([^/]+\.ya?ml)(#.*)?$)
@@ -159,6 +165,9 @@ class NightlyLink
     messages = Tuple.new
     url = h = nil
     canonical = abs_url(NightlyLink.gen_index)
+    example_workflow, example_args = WORKFLOW_EXAMPLES.sample
+    example_art = example_args[:artifact]
+    example_dest = abs_url(NightlyLink.gen_by_branch(**example_args))
 
     ctx.response.content_type = "text/html"
     ECR.embed("templates/head.html", ctx.response)
@@ -190,6 +199,7 @@ class NightlyLink
     end
 
     canonical = abs_url(NightlyLink.gen_index_form)
+    example_workflow = example_art = example_dest = nil
     ctx.response.content_type = "text/html"
     ECR.embed("templates/head.html", ctx.response)
     ctx.response << "<title>nightly.link</title>"
@@ -384,6 +394,7 @@ class NightlyLink
     return result
   end
 
+  @[Retour::Get("/{repo_owner}/{repo_name}/suites/{check_suite_id:[0-9]+}/artifacts/{artifact_id:[0-9]+}{zip:}")]
   @[Retour::Get("/{repo_owner}/{repo_name}/actions/artifacts/{artifact_id:[0-9]+}{zip:\\.zip}")]
   @[Retour::Get("/{repo_owner}/{repo_name}/actions/artifacts/{artifact_id:[0-9]+}")]
   def by_artifact(ctx, repo_owner : String, repo_name : String, artifact_id : String | Int64, check_suite_id : String | Int64? = nil, h : String? = nil, zip : String? = nil)

@@ -7,7 +7,7 @@
   (optional, other than for private repos; feel free to <a href="https://github.com/settings/apps/authorizations" target="_blank">revoke</a> this anytime)
 </form>
 
-<h2>Get a link to a repository's artifacts</h2>
+<h2>Get a link to a repository's latest artifact</h2>
 
 <form action="/" method="POST">
   <label>Insert the GitHub URL of a workflow file that uses <a href="https://github.com/actions/upload-artifact#readme">actions/upload-artifact</a>:<br/>
@@ -17,6 +17,16 @@
   <% messages.each do |message| %>
     <p style="color: maroon"><%= HTML.escape(message) %></p>
   <% end %>
-  <% example = WORKFLOW_EXAMPLES.sample %>
-  <p>Example:<br><a href="<%= HTML.escape(example) %>" target="_blank"><%= HTML.escape(example) %></a></p>
 </form>
+<% if example_workflow && example_art && example_dest %>
+<p>Example: <a href="<%= HTML.escape(example_workflow) %>" target="_blank"><%= HTML.escape(example_workflow) %></a></p>
+<p>Following this form (and having selected the "<%= example_art %>" artifact), you will end up at<br><a href="<%= HTML.escape(example_dest) %>" rel="nofollow"><%= HTML.escape(example_dest) %></a> [<a href="<%= HTML.escape(example_dest) %>.zip" rel="nofollow">.zip</a>]<br>
+which is a link that always downloads the latest artifact from a succeeding run on that repo+workflow+branch.</p>
+<p>If you have several workflows or branches, you can adapt the URL by hand in a predictable way.</p>
+<% end %>
+
+<h2>Get a link to a particular artifact</h2>
+
+<p>If GitHub gave you a link such as <u>https://github.com/UserName/RepoName/suites/1234567890/artifacts/12345678</u>,<br>
+you can just change the prefix to <u><%= HTML.escape(abs_url("/UserName/RepoName/suites/1234567890/artifacts/12345678")) %></u>,<br>
+and you get a download URL that works the same but doesn't give a "404" error to users who aren't logged into GitHub.</p>
