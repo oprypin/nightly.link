@@ -1,33 +1,5 @@
 version: 2.0
 shards:
-  amber_router:
-    git: https://github.com/amberframework/amber-router.git
-    version: 0.4.4
-
-  athena:
-    git: https://github.com/athena-framework/athena.git
-    version: 0.12.0
-
-  athena-config:
-    git: https://github.com/athena-framework/config.git
-    version: 0.1.3
-
-  athena-dependency_injection:
-    git: https://github.com/athena-framework/dependency-injection.git
-    version: 0.2.3
-
-  athena-event_dispatcher:
-    git: https://github.com/athena-framework/event-dispatcher.git
-    version: 0.1.3
-
-  athena-serializer:
-    git: https://github.com/athena-framework/serializer.git
-    version: 0.2.3
-
-  athena-validator:
-    git: https://github.com/athena-framework/validator.git
-    version: 0.1.4
-
   bindata:
     git: https://github.com/spider-gazelle/bindata.git
     version: 1.8.1
@@ -63,6 +35,10 @@ shards:
   openssl_ext:
     git: https://github.com/spider-gazelle/openssl_ext.git
     version: 2.1.0
+
+  retour:
+    git: https://github.com/oprypin/retour.git
+    version: 0.1.0+git.commit.e049bbd0bf8abbe2f2451a8db7dc028fd1776955
 
   sqlite3:
     git: https://github.com/crystal-lang/crystal-sqlite3.git

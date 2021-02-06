@@ -8,8 +8,8 @@ description: |
   Downloads the latest "nightly" build/artifact from a continuous testing workflow
 
 dependencies:
-  athena:
-    github: athena-framework/athena
+  retour:
+    github: oprypin/retour
   jwt:
     github: crystal-community/jwt
   halite:
