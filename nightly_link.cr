@@ -356,7 +356,7 @@ class ArtifactsController < ART::Controller
       end
       raise e
     end
-    art = artifacts.find { |a| a.name == artifact }
+    art = artifacts.find { |a| a.name == artifact } || artifacts.find { |a| a.name == "#{artifact}.zip" }
     raise ART::Exceptions::NotFound.new(
       "Artifact '#{artifact}' not found for run ##{run_id}.\nCheck on GitHub: <#{gh_link}>"
     ) if !art
