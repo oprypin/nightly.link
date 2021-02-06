@@ -251,7 +251,7 @@ class NightlyLink
   def dash_by_branch(ctx, repo_owner : String, repo_name : String, workflow : String, branch : String)
     h = ctx.request.query_params["h"]?
     token, h = RepoInstallation.verified_token(repo_owner, repo_name, h: h)
-    unless workflow.to_i? || workflow.ends_with?(".yml") || workflow.ends_with?(".yaml")
+    unless workflow.to_i64?(whitespace: false) || workflow.ends_with?(".yml") || workflow.ends_with?(".yaml")
       workflow += ".yml"
     end
 
@@ -328,7 +328,7 @@ class NightlyLink
   def by_branch(ctx, repo_owner : String, repo_name : String, workflow : String, branch : String, artifact : String, h : String? = nil, zip : String? = nil)
     h = ctx.request.query_params["h"]? if ctx
     token, h = RepoInstallation.verified_token(repo_owner, repo_name, h: h)
-    unless workflow.to_i? || workflow.ends_with?(".yml") || workflow.ends_with?(".yaml")
+    unless workflow.to_i64?(whitespace: false) || workflow.ends_with?(".yml") || workflow.ends_with?(".yaml")
       workflow += ".yml"
     end
     run = get_latest_run(repo_owner, repo_name, workflow, branch, token)
@@ -347,8 +347,8 @@ class NightlyLink
     return result
   end
 
-  # @[Retour::Get("/{repo_owner}/{repo_name}/{actions}/{runs}/{run_id}/{artifact}{zip:\\.zip}")]
-  # @[Retour::Get("/{repo_owner}/{repo_name}/{actions}/{runs}/{run_id}/{artifact}")]
+  # @[Retour::Get("/{repo_owner}/{repo_name}/{actions}/{runs}/{run_id:[0-9]+}/{artifact}{zip:\\.zip}")]
+  # @[Retour::Get("/{repo_owner}/{repo_name}/{actions}/{runs}/{run_id:[0-9]+}/{artifact}")]
   def by_run(ctx, repo_owner : String, repo_name : String, run_id : Int64 | String, artifact : String, check_suite_id : Int64? | String, h : String? = nil, zip : String? = nil)
     run_id = run_id.to_i64 rescue raise HTTPException.new(:NotFound)
     check_suite_id = check_suite_id && check_suite_id.to_i64 rescue raise HTTPException.new(:NotFound)
