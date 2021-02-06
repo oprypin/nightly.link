@@ -38,7 +38,7 @@ shards:
 
   retour:
     git: https://github.com/oprypin/retour.git
-    version: 0.1.0+git.commit.be47661d0498b79d700b73f4786a9942b570ccb1
+    version: 0.1.0+git.commit.e049bbd0bf8abbe2f2451a8db7dc028fd1776955
 
   sqlite3:
     git: https://github.com/crystal-lang/crystal-sqlite3.git
