@@ -460,7 +460,7 @@ class NightlyLink
     @[Retour::Get({{"/#{path.id}"}})]
     def static{{i}}(ctx)
       ctx.response.headers.merge!({{headers}})
-      ctx.response << {{read_file("#{__DIR__}/#{path.id}")}}
+      ctx.response << {{read_file(path.id)}}
     end
   {% end %}
 end

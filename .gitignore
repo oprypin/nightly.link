@@ -6,6 +6,7 @@
 !/logo.svg
 !/shard.yml
 !/shard.lock
-!/*.cr
+!/src/
+!/src/*.cr
 !/templates
 !/templates/*.html

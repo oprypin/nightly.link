@@ -5,10 +5,10 @@ md_files = $(wildcard *.md)
 html_files := $(md_files:.md=.html)
 vendored_files := github-markdown.min.css
 
-nightly_link: nightly_link.cr $(wildcard *.cr) $(html_files) $(wildcard templates/*.html) $(vendored_files)
+nightly_link: src/nightly_link.cr $(wildcard src/*.cr) $(html_files) $(wildcard templates/*.html) $(vendored_files)
 	$(CRYSTAL) build --error-trace $(if $(release),--release )$<
 
-render_md: render_md.cr
+render_md: src/render_md.cr
 	$(CRYSTAL) build --error-trace $<
 
 %.html: %.md render_md

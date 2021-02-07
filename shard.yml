@@ -7,6 +7,10 @@ authors:
 description: |
   Downloads the latest "nightly" build/artifact from a continuous testing workflow
 
+targets:
+  server:
+    main: src/nightly_link.cr
+
 dependencies:
   retour:
     github: oprypin/retour
