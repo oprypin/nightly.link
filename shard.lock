@@ -40,6 +40,10 @@ shards:
     git: https://github.com/oprypin/retour.git
     version: 0.1.0+git.commit.e049bbd0bf8abbe2f2451a8db7dc028fd1776955
 
+  spec_assert:
+    git: https://github.com/oprypin/spec-assert.git
+    version: 0.1.0+git.commit.96c61f47212daed5277f8bba236a271fab627067
+
   sqlite3:
     git: https://github.com/crystal-lang/crystal-sqlite3.git
     version: 0.18.0
@@ -47,4 +51,8 @@ shards:
   tasker:
     git: https://github.com/spider-gazelle/tasker.git
     version: 2.0.2
+
+  webmock:
+    git: https://github.com/manastech/webmock.cr.git
+    version: 0.14.0
 

@@ -29,4 +29,10 @@ dependencies:
   future:
     github: crystal-community/future.cr
 
+development_dependencies:
+  spec_assert:
+    github: oprypin/spec-assert
+  webmock:
+    github: manastech/webmock.cr
+
 license: AGPL-3.0

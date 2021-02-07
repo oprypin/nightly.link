@@ -245,7 +245,6 @@ end
 struct WorkflowRun
   include JSON::Serializable
   property id : Int64
-  property head_branch : String
   property event : String
   property workflow_id : Int64
   property check_suite_url : String

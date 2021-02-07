@@ -8,6 +8,8 @@
 !/shard.lock
 !/src/
 !/src/*.cr
+!/spec/
+!/spec/*.cr
 !/templates/
 !/templates/*.html
 !/.github/

@@ -24,5 +24,7 @@ jobs:
         run: shards check || shards install
       - name: Build
         run: make -j
+      - name: Run tests
+        run: crystal spec --order=random
       - name: Check formatting
         run: crystal tool format --check
