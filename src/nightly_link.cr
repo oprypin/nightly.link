@@ -137,8 +137,8 @@ class NightlyLink
   })
 
   WORKFLOW_EXAMPLES = {
-    "https://github.com/actions/upload-artifact/blob/main/.github/workflows/test.yml" => {
-      repo_owner: "actions", repo_name: "upload-artifact", workflow: "test", branch: "main", artifact: "artifact",
+    "https://github.com/oprypin/nightly.link/blob/master/.github/workflows/upload-test.yml" => {
+      repo_owner: "oprypin", repo_name: "nightly.link", workflow: "upload-test", branch: "master", artifact: "some-artifact",
     },
     "https://github.com/crystal-lang/crystal/blob/master/.github/workflows/win.yml" => {
       repo_owner: "crystal-lang", repo_name: "crystal", workflow: "win", branch: "master", artifact: "crystal",
