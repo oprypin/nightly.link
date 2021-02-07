@@ -73,6 +73,7 @@ class GitHubAppAuth
         Log.info { "Token for ##{installation_id} had #{RateLimits.for_token(old_token)}" }
       end
     end
+    # https://docs.github.com/en/rest/reference/apps#create-an-installation-access-token-for-an-app
     resp = GitHub.post(
       "/app/installations/#{installation_id}/access_tokens",
       json: {permissions: {actions: "read"}},
@@ -113,7 +114,7 @@ macro get_json_list(t, url, params = NamedTuple.new, max_items = 1000, **kwargs)
   while %url
     %resp = GitHub.get(%url, params: %params, {{**kwargs}})
     %resp.raise_for_status
-    %result = {{t}}.from_json(%resp.body)
+    %result = {{t}}.from_json(%resp.body).tap { |r| Log.debug { r.to_json } }
     %url = %resp.links.try(&.["next"]?).try(&.target)
     %params = {per_page: %max_items}
     %result {% if t.is_a?(Path) %}.{{t.id.underscore}}{% end %}.each do |x|
@@ -148,8 +149,12 @@ struct Installations
 end
 
 module RFC3339Converter
-  def self.from_json(value : JSON::PullParser) : Time
-    Time.parse_rfc3339(value.read_string)
+  def self.from_json(json : JSON::PullParser) : Time
+    Time.parse_rfc3339(json.read_string)
+  end
+
+  def self.to_json(value : Time, json : JSON::Builder) : Nil
+    json.string(value.to_rfc3339)
   end
 end
 
@@ -164,7 +169,7 @@ struct Installation
     # https://docs.github.com/v3/apps#get-an-installation-for-the-authenticated-app
     resp = GitHub.get("app/installations/#{id}", headers: {Authorization: token})
     resp.raise_for_status
-    Installation.from_json(resp.body)
+    Installation.from_json(resp.body).tap { |r| Log.debug { r.to_json } }
   end
 end
 
@@ -176,7 +181,7 @@ struct Account
     # https://docs.github.com/v3/users#get-the-authenticated-user
     resp = GitHub.get("user", headers: {Authorization: token})
     resp.raise_for_status
-    Account.from_json(resp.body)
+    Account.from_json(resp.body).tap { |r| Log.debug { r.to_json } }
   end
 end
 
@@ -303,7 +308,7 @@ struct RateLimits
   def self.for_token(token : Token) : RateLimits
     resp = Halite.get("https://api.github.com/rate_limit", headers: {Authorization: token})
     resp.raise_for_status
-    RateLimits.from_json(resp.body, root: "resources")
+    RateLimits.from_json(resp.body, root: "resources").tap { |r| Log.debug { r.to_json } }
   end
 end
 

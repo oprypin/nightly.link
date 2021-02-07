@@ -20,6 +20,8 @@ FALLBACK_INSTALL_ID  = ENV["FALLBACK_INSTALLATION_ID"].to_i64
 PORT                 = ENV["PORT"].to_i
 URL                  = Path.posix(ENV["URL"]? || "https://nightly.link/")
 
+Log.setup_from_env
+
 def abs_url(path : String) : String
   URL.join(path).to_s
 end
