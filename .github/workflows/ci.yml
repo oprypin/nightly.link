@@ -25,6 +25,6 @@ jobs:
       - name: Build
         run: make -j
       - name: Run tests
-        run: crystal spec --order=random
+        run: make -j test
       - name: Check formatting
         run: crystal tool format --check

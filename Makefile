@@ -4,8 +4,9 @@ release ?=
 md_files = $(wildcard *.md)
 html_files := $(md_files:.md=.html)
 vendored_files := github-markdown.min.css
+all_sources := src/nightly_link.cr $(wildcard src/*.cr) $(html_files) $(wildcard templates/*.html) $(vendored_files)
 
-nightly_link: src/nightly_link.cr $(wildcard src/*.cr) $(html_files) $(wildcard templates/*.html) $(vendored_files)
+nightly_link: $(all_sources)
 	$(CRYSTAL) build --error-trace $(if $(release),--release )$<
 
 render_md: src/render_md.cr
@@ -16,6 +17,16 @@ render_md: src/render_md.cr
 
 github-markdown.min.css:
 	curl -O https://cdnjs.cloudflare.com/ajax/libs/github-markdown-css/4.0.0/github-markdown.min.css
+
+lib: shard.lock
+	shards install
+
+shard.lock: shard.yml
+	shards update
+
+.PHONY: test
+test: $(all_sources)
+	crystal spec --order=random
 
 .PHONY: clean
 clean:
