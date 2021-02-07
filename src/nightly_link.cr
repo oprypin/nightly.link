@@ -162,29 +162,11 @@ class NightlyLink
 
   @[Retour::Get("/")]
   def index(ctx)
-    messages = Tuple.new
-    url = h = nil
-    canonical = abs_url(NightlyLink.gen_index)
-    example_workflow, example_args = WORKFLOW_EXAMPLES.sample
-    example_art = example_args[:artifact]
-    example_dest = abs_url(NightlyLink.gen_by_branch(**example_args))
-
-    ctx.response.content_type = "text/html"
-    ECR.embed("templates/head.html", ctx.response)
-    ctx.response << "<title>nightly.link</title>"
-    ECR.embed("README.html", ctx.response)
-  end
-
-  @[Retour::Post("/")]
-  def index_form(ctx)
-    if (body = ctx.request.body)
-      data = HTTP::Params.parse(body.gets_to_end)
-      url = data["url"]?
-      h = data["h"]?
-    end
+    url = ctx.request.query_params["url"]?.presence
+    h = ctx.request.query_params["h"]?.presence
 
     messages = [] of String
-    if url.presence
+    if url
       if url =~ workflow_pattern
         repo_owner, repo_name, branch, workflow = $1, $2, $4, $5
         if branch =~ /^[0-9a-fA-F]{32,}$/
@@ -198,8 +180,11 @@ class NightlyLink
       messages.unshift("Did not detect a link to a GitHub workflow file.")
     end
 
-    canonical = abs_url(NightlyLink.gen_index_form)
-    example_workflow = example_art = example_dest = nil
+    canonical = abs_url(NightlyLink.gen_index)
+    example_workflow, example_args = WORKFLOW_EXAMPLES.sample
+    example_art = example_args[:artifact]
+    example_dest = abs_url(NightlyLink.gen_by_branch(**example_args))
+
     ctx.response.content_type = "text/html"
     ECR.embed("templates/head.html", ctx.response)
     ctx.response << "<title>nightly.link</title>"
