@@ -8,5 +8,8 @@
 !/shard.lock
 !/src/
 !/src/*.cr
-!/templates
+!/templates/
 !/templates/*.html
+!/.github/
+!/.github/workflows
+!/.github/workflows/*.yml
