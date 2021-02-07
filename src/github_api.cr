@@ -51,17 +51,21 @@ struct OAuthToken < Token
 end
 
 class GitHubAppAuth
-  def initialize(@app_id : Int32, @pem_filename : String)
+  def initialize(@app_id : Int32, @pem_filename : String?)
   end
 
   def jwt : AppToken
+    if !(pem_filename = @pem_filename)
+      Log.error { "pem_filename not specified!" }
+      return AppToken.new("")
+    end
     @@jwt.fetch(@app_id, expires_in: 9.minutes) do
       AppToken.new(
         JWT.encode({
           iat: Time.utc.to_unix,                # issued at time
           exp: (Time.utc + 10.minutes).to_unix, # JWT expiration time (10 minute maximum)
           iss: @app_id,                         # GitHub App's identifier
-        }, File.read(@pem_filename), JWT::Algorithm::RS256)
+        }, File.read(pem_filename), JWT::Algorithm::RS256)
       )
     end
   end

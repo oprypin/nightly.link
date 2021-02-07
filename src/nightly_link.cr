@@ -14,10 +14,10 @@ GITHUB_APP_NAME      = ENV["GITHUB_APP_NAME"]
 GITHUB_APP_ID        = ENV["GITHUB_APP_ID"].to_i
 GITHUB_CLIENT_ID     = ENV["GITHUB_CLIENT_ID"]
 GITHUB_CLIENT_SECRET = ENV["GITHUB_CLIENT_SECRET"]
-GITHUB_PEM_FILENAME  = ENV["GITHUB_PEM_FILENAME"]
+GITHUB_PEM_FILENAME  = ENV["GITHUB_PEM_FILENAME"]?
 APP_SECRET           = ENV["APP_SECRET"]
 FALLBACK_INSTALL_ID  = ENV["FALLBACK_INSTALLATION_ID"].to_i64
-PORT                 = ENV["PORT"].to_i
+PORT                 = ENV["PORT"]?.try(&.to_i)
 URL                  = Path.posix(ENV["URL"]? || "https://nightly.link/")
 
 Log.setup_from_env
@@ -450,6 +450,25 @@ class NightlyLink
       ctx.response << {{read_file(path.id)}}
     end
   {% end %}
+
+  def serve_request(ctx, reraise = false)
+    call(ctx, ctx)
+  rescue exception
+    if exception.is_a?(Retour::NotFound)
+      exception = HTTPException.new(:NotFound, exception.to_s)
+    elsif !exception.is_a?(HTTPException)
+      raise exception if reraise
+      Log.error(exception: exception) { }
+      exception = HTTPException.new(:InternalServerError)
+    end
+    ctx.response.content_type = "text/html"
+    ctx.response.status = status = exception.status
+    ctx.response.headers.merge!(exception.headers)
+    return if status.redirection?
+    canonical = nil
+    ECR.embed("templates/head.html", ctx.response)
+    ECR.embed("templates/error.html", ctx.response)
+  end
 end
 
 class HTTPException < Exception
@@ -466,27 +485,13 @@ class HTTPException < Exception
   end
 end
 
-app = NightlyLink.new
-server = HTTP::Server.new([
-  HTTP::LogHandler.new,
-]) do |ctx|
-  begin
-    app.call(ctx, ctx)
-  rescue exception
-    if exception.is_a?(Retour::NotFound)
-      exception = HTTPException.new(:NotFound, exception.to_s)
-    elsif !exception.is_a?(HTTPException)
-      Log.error(exception: exception) { }
-      exception = HTTPException.new(:InternalServerError)
-    end
-    ctx.response.content_type = "text/html"
-    ctx.response.status = status = exception.status
-    ctx.response.headers.merge!(exception.headers)
-    next if status.redirection?
-    canonical = nil
-    ECR.embed("templates/head.html", ctx.response)
-    ECR.embed("templates/error.html", ctx.response)
+if (port = PORT)
+  app = NightlyLink.new
+  server = HTTP::Server.new([
+    HTTP::LogHandler.new,
+  ]) do |ctx|
+    app.serve_request(ctx)
   end
+  server.bind_tcp("127.0.0.1", port)
+  server.listen
 end
-server.bind_tcp("127.0.0.1", PORT)
-server.listen
