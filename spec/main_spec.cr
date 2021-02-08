@@ -202,7 +202,7 @@ describe "static" do
   end
 end
 
-APP = NightlyLink.new
+APP = NightlyLink.new(db: DB.open("sqlite3::memory:"))
 
 def serve(method : String, path : String)
   io = IO::Memory.new

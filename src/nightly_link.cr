@@ -18,12 +18,13 @@ GITHUB_PEM_FILENAME  = ENV["GITHUB_PEM_FILENAME"]?
 APP_SECRET           = ENV["APP_SECRET"]
 FALLBACK_INSTALL_ID  = ENV["FALLBACK_INSTALLATION_ID"].to_i64
 PORT                 = ENV["PORT"]?.try(&.to_i)
-URL                  = Path.posix(ENV["URL"]? || "https://nightly.link/")
+URL                  = ENV["URL"]? || "https://nightly.link/"
+DATABASE_FILE        = ENV["DATABASE_FILE"]? || "./db.sqlite"
 
 Log.setup_from_env
 
 def abs_url(path : String) : String
-  URL.join(path).to_s
+  Path.posix(URL).join(path).to_s
 end
 
 GitHubApp = GitHubAppAuth.new(
@@ -31,27 +32,28 @@ GitHubApp = GitHubAppAuth.new(
   pem_filename: GITHUB_PEM_FILENAME,
 )
 
-D = DB.open("sqlite3:./db.sqlite")
-D.exec(%(
-  CREATE TABLE IF NOT EXISTS installations (
-    repo_owner TEXT NOT NULL, installation_id INTEGER NOT NULL, public_repos TEXT NOT NULL, private_repos TEXT NOT NULL,
-    UNIQUE(repo_owner)
-  )
-))
-
 record RepoInstallation,
   repo_owner : String,
   installation_id : InstallationId,
   public_repos : DelimitedString,
   private_repos : DelimitedString do
-  def write : Nil
-    D.exec(%(
+  def self.init_db(db : DB::Database)
+    db.exec(%(
+      CREATE TABLE IF NOT EXISTS installations (
+        repo_owner TEXT NOT NULL, installation_id INTEGER NOT NULL, public_repos TEXT NOT NULL, private_repos TEXT NOT NULL,
+        UNIQUE(repo_owner)
+      )
+    ))
+  end
+
+  def write(db : DB::Database) : Nil
+    db.exec(%(
       REPLACE INTO installations (repo_owner, installation_id, public_repos, private_repos) VALUES(?, ?, ?, ?)
     ), @repo_owner, @installation_id, @public_repos.to_s, @private_repos.to_s)
   end
 
-  def self.read(*, repo_owner : String) : RepoInstallation?
-    D.query(%(
+  def self.read(db : DB::Database, *, repo_owner : String) : RepoInstallation?
+    db.query(%(
       SELECT installation_id, public_repos, private_repos FROM installations WHERE repo_owner = ? COLLATE NOCASE LIMIT 1
     ), repo_owner) do |rs|
       rs.each do
@@ -63,14 +65,14 @@ record RepoInstallation,
     end
   end
 
-  def self.delete(repo_owner : String) : Nil
-    D.exec(%(
+  def self.delete(db : DB::Database, *, repo_owner : String) : Nil
+    db.exec(%(
       DELETE FROM installations WHERE repo_owner = ?
     ), repo_owner)
   end
 
   {% for tok in [true, false] %}
-    def self.refresh(installation : Installation{% if tok %}, token : UserToken{% end %}) : RepoInstallation
+    def self.refresh(db : DB::Database, installation : Installation{% if tok %}, token : UserToken{% end %}) : RepoInstallation
       public_repos = DelimitedString::Builder.new
       private_repos = DelimitedString::Builder.new
       {% if tok %}
@@ -87,7 +89,7 @@ record RepoInstallation,
         installation.account.login, installation.id,
         public_repos.build, private_repos.build
       )
-      inst.write
+      inst.write(db)
       inst
     end
   {% end %}
@@ -110,8 +112,8 @@ record RepoInstallation,
     result
   end
 
-  def self.verified_token(repo_owner : String, repo_name : String, *, h : String?) : {InstallationToken, String?}
-    if (inst = RepoInstallation.read(repo_owner: repo_owner))
+  def self.verified_token(db : DB::Database, repo_owner : String, repo_name : String, *, h : String?) : {InstallationToken, String?}
+    if (inst = RepoInstallation.read(db, repo_owner: repo_owner))
       h = inst.verify(repo_name: repo_name, h: h)
       {GitHubApp.token(inst.installation_id), h}
     else
@@ -132,6 +134,10 @@ end
 
 class NightlyLink
   include Retour::HTTPRouter
+
+  def initialize(@db : DB::Database = DB.open("sqlite3:#{DATABASE_FILE}"))
+    RepoInstallation.init_db(db)
+  end
 
   RECONFIGURE_URL = "https://github.com/apps/#{GITHUB_APP_NAME}/installations/new"
   AUTH_URL        = "https://github.com/login/oauth/authorize?" + HTTP::Params.encode({
@@ -220,7 +226,7 @@ class NightlyLink
     ch = Channel(RepoInstallation).new
     futures = [] of Future::Compute(RepoInstallation)
     Installations.for_user(token: token) do |inst|
-      futures << future { RepoInstallation.refresh(inst, token) }
+      futures << future { RepoInstallation.refresh(@db, inst, token) }
     end
     installations = futures.map(&.get)
 
@@ -237,7 +243,7 @@ class NightlyLink
     installation_id = ctx.request.query_params["installation_id"].to_i64 rescue raise HTTPException.new(:BadRequest)
     spawn do
       inst = Installation.for_id(installation_id, GitHubApp.jwt)
-      RepoInstallation.refresh(inst)
+      RepoInstallation.refresh(@db, inst)
     end
     raise HTTPException.redirect("/")
   end
@@ -247,7 +253,7 @@ class NightlyLink
   @[Retour::Get("/{repo_owner}/{repo_name}/workflows/{workflow}/{branch}")]
   def dash_by_branch(ctx, repo_owner : String, repo_name : String, workflow : String, branch : String)
     h = ctx.request.query_params["h"]?
-    token, h = RepoInstallation.verified_token(repo_owner, repo_name, h: h)
+    token, h = RepoInstallation.verified_token(@db, repo_owner, repo_name, h: h)
     unless workflow.to_i64?(whitespace: false) || workflow.ends_with?(".yml") || workflow.ends_with?(".yaml")
       workflow += ".yml"
     end
@@ -324,7 +330,7 @@ class NightlyLink
   @[Retour::Get("/{repo_owner}/{repo_name}/workflows/{workflow}/{branch}/{artifact}")]
   def by_branch(ctx, repo_owner : String, repo_name : String, workflow : String, branch : String, artifact : String, h : String? = nil, zip : String? = nil)
     h = ctx.request.query_params["h"]? if ctx
-    token, h = RepoInstallation.verified_token(repo_owner, repo_name, h: h)
+    token, h = RepoInstallation.verified_token(@db, repo_owner, repo_name, h: h)
     unless workflow.to_i64?(whitespace: false) || workflow.ends_with?(".yml") || workflow.ends_with?(".yaml")
       workflow += ".yml"
     end
@@ -350,7 +356,7 @@ class NightlyLink
     run_id = run_id.to_i64 rescue raise HTTPException.new(:NotFound)
     check_suite_id = check_suite_id && check_suite_id.to_i64 rescue raise HTTPException.new(:NotFound)
     h = ctx.request.query_params["h"]? if ctx
-    token, h = RepoInstallation.verified_token(repo_owner, repo_name, h: h)
+    token, h = RepoInstallation.verified_token(@db, repo_owner, repo_name, h: h)
 
     gh_link = github_run_link(repo_owner, repo_name, run_id)
     artifacts = begin
@@ -389,7 +395,7 @@ class NightlyLink
       check_suite_id = check_suite_id.to_i64 rescue raise HTTPException.new(:NotFound)
     end
     h = ctx.request.query_params["h"]? if ctx
-    token, h = RepoInstallation.verified_token(repo_owner, repo_name, h: h)
+    token, h = RepoInstallation.verified_token(@db, repo_owner, repo_name, h: h)
 
     artifact_gh_link = "https://github.com/#{repo_owner}/#{repo_name}/suites/#{check_suite_id}/artifacts/#{artifact_id}" if check_suite_id
     gh_link = artifact_gh_link || "https://api.github.com/repos/#{repo_owner}/#{repo_name}/actions/artifacts/#{artifact_id}"
