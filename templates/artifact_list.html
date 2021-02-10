@@ -6,9 +6,9 @@
   <p style="color: maroon"><%= HTML.escape(message.not_nil!) %></p>
 <% end %>
 <p>Choose one of the artifacts:</p>
-<ul>
+<table>
   <% links.each do |link| %>
-    <li><b><a href="<%= HTML.escape(link.url) %>"><%= HTML.escape(link.title) %></a></b>:
-    <a href="<%= HTML.escape(link.url) %>.zip"><%= HTML.escape(link.url) %>.zip</a>
+    <tr><th><a href="<%= HTML.escape(link.url) %>"><%= HTML.escape(link.title) %></a></th>
+    <td><a href="<%= HTML.escape(link.url) %>.zip"><%= HTML.escape(link.url) %>.zip</a></td></tr>
   <% end %>
-</ul>
+</table>
