@@ -1,0 +1,21 @@
+<title>nightly.link | <%= HTML.escape(title[0]) %> | <%= HTML.escape(title[1]) %></title>
+<h1><a href="/">nightly.link</a></h1>
+<h2><%= HTML.escape(title[0]) %></h2>
+<h3><%= HTML.escape(title[1]) %></h3>
+<% {false, true}.each do |ext| %>
+  <% if ext %>
+    <p>Pages on GitHub:</p>
+  <% else %>
+    <p>View logs for this job:</p>
+  <% end %>
+  <ul>
+    <% links.each_with_index do |link, i| %>
+      <% if link.ext == ext %>
+        <li>
+          <% if !ext && i == 0 %><b><% end %><a href="<%= HTML.escape(link.url) %>"<% if ext %> rel="nofollow" target="_blank"<% end %>><%= HTML.escape(link.title || link.url) %></a><% if !ext && i == 0 %></b><% end %>
+        </li>
+      <% end %>
+    <% end %>
+  </ul>
+<% end %>
+<p>Note that artifacts should be accessed through the parent <i>run</i> that triggered this <i>job</i>.</p>

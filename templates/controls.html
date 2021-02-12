@@ -22,7 +22,7 @@
   <p>Please check below for recognized link formats:</p>
 <% end %>
 
-<h2>Get a link to a repository's latest artifact</h2>
+<h3>Get a link to a repository's latest artifact</h3>
 <form action="/">
   <label>Insert the GitHub URL of a workflow file that uses <a href="https://github.com/actions/upload-artifact#readme">actions/upload-artifact</a>:<br/>
   <input name="url" required placeholder="<%= HTML.escape(workflow_placeholder) %>" <% if url %>value="<%= HTML.escape(url.not_nil!) %>"<% end %> style="width: 80%"></label>
@@ -35,7 +35,7 @@ which is a link that always downloads the latest artifact from a succeeding run 
 <p>If you have several workflows or branches, you can adapt the URL by hand in a predictable way.</p>
 <% end %>
 
-<h2>Get a link to a particular artifact</h2>
+<h3>Get a link to a particular artifact</h3>
 
 <p>If GitHub gave you a link such as <u>https://github.com/UserName/RepoName/suites/1234567890/artifacts/12345678</u>,<br>
 you can just change the prefix to <u><%= HTML.escape(abs_url("/UserName/RepoName/suites/1234567890/artifacts/12345678")) %></u>,<br>

@@ -123,11 +123,11 @@ record RepoInstallation,
 end
 
 private def github_job_link(repo_owner : String, repo_name : String, job_id : Int64) : String
-  "https://github.com/#{repo_owner}/#{repo_name}/runs/#{job_id}"
+  "https://github.com" + GitHubRoutes.gen_job(repo_owner: repo_owner, repo_name: repo_name, job_id: job_id)
 end
 
 private def github_run_link(repo_owner : String, repo_name : String, run_id : Int64) : String
-  "https://github.com/#{repo_owner}/#{repo_name}/actions/runs/#{run_id}#artifacts"
+  "https://github.com" + GitHubRoutes.gen_run(repo_owner: repo_owner, repo_name: repo_name, run_id: run_id) + "#artifacts"
 end
 
 private def github_actions_link(repo_owner : String, repo_name : String, *, event : String, branch : String) : String
@@ -148,14 +148,24 @@ module GitHubRoutes
     NightlyLink.gen_dash_by_branch(repo_owner: repo_owner, repo_name: repo_name, workflow: workflow.rchop(".yml"), branch: branch)
   end
 
+  @[Retour::Get("/{repo_owner}/{repo_name}/actions/runs/{run_id:[0-9]+}")]
+  def run(repo_owner, repo_name, run_id, direct : Bool)
+    NightlyLink.gen_dash_by_run(repo_owner: repo_owner, repo_name: repo_name, run_id: run_id)
+  end
+
+  @[Retour::Get("/{repo_owner}/{repo_name}/runs/{job_id:[0-9]+}")]
+  def job(repo_owner, repo_name, job_id, direct : Bool)
+    NightlyLink.gen_by_job(repo_owner: repo_owner, repo_name: repo_name, job_id: job_id)
+  end
+
   @[Retour::Get("/{repo_owner}/{repo_name}/suites/{check_suite_id:[0-9]+}/artifacts/{artifact_id:[0-9]+}")]
   def artifact_download(repo_owner, repo_name, check_suite_id, artifact_id, direct : Bool)
-    NightlyLink.gen_by_artifact(repo_owner: repo_owner, repo_name: repo_name, artifact_id: artifact_id, zip: direct)
+    NightlyLink.gen_by_artifact(repo_owner: repo_owner, repo_name: repo_name, artifact_id: artifact_id, zip: (".zip" if direct))
   end
 
   @[Retour::Get("/{repo_owner}/{repo_name}/commit/{commit:[0-9a-fA-F]{40}}/checks/{job_id:[0-9]+}/logs")]
   def logs_download(repo_owner, repo_name, commit, job_id, direct : Bool)
-    NightlyLink.gen_logs_by_job(repo_owner: repo_owner, repo_name: repo_name, job_id: job_id)
+    NightlyLink.gen_by_job(repo_owner: repo_owner, repo_name: repo_name, job_id: job_id, txt: (".txt" if direct))
   end
 end
 
@@ -302,6 +312,43 @@ class NightlyLink
     end
     canonical = abs_url(NightlyLink.gen_dash_by_branch(repo_owner: repo_owner, repo_name: repo_name, workflow: workflow.rchop(".yml"), branch: branch))
     canonical += "?h=#{h}" if h
+
+    ctx.response.content_type = "text/html"
+    ECR.embed("templates/head.html", ctx.response)
+    ECR.embed("templates/artifact_list.html", ctx.response)
+  end
+
+  @[Retour::Get("/{repo_owner}/{repo_name}/actions/runs/{run_id:[0-9]+}")]
+  def dash_by_run(ctx, repo_owner : String, repo_name : String, run_id : Int64 | String)
+    run_id = run_id.to_i64 rescue raise HTTPException.new(:NotFound)
+    h = ctx.request.query_params["h"]? if ctx
+    token, h = RepoInstallation.verified_token(@db, repo_owner, repo_name, h: h)
+
+    gh_link = github_run_link(repo_owner, repo_name, run_id)
+    artifacts = begin
+      Artifacts.for_run(repo_owner, repo_name, run_id, token, expires_in: 3.hours)
+    rescue e : Halite::Exception::ClientError
+      if e.status_code.in?(401, 404)
+        raise HTTPException.new(:NotFound,
+          "Repository '#{repo_owner}/#{repo_name}' or run ##{run_id} not found.\nCheck on GitHub: <#{gh_link}>")
+      end
+      raise e
+    end
+    if artifacts.empty?
+      raise HTTPException.new(:NotFound,
+        "No artifacts found for run ##{run_id}.\nCheck on GitHub: <#{gh_link}>"
+      )
+    end
+
+    title = {"Repository #{repo_owner}/#{repo_name}", "Run ##{run_id}"}
+    links = artifacts.map do |art|
+      link = abs_url(NightlyLink.gen_by_run(repo_owner: repo_owner, repo_name: repo_name, run_id: run_id, artifact: art.name))
+      link += "?h=#{h}" if h
+      Link.new(link, art.name)
+    end
+    canonical = abs_url(NightlyLink.gen_dash_by_run(repo_owner: repo_owner, repo_name: repo_name, run_id: run_id))
+    canonical += "?h=#{h}" if h
+    message = nil
 
     ctx.response.content_type = "text/html"
     ECR.embed("templates/head.html", ctx.response)
@@ -458,8 +505,9 @@ class NightlyLink
     end
   end
 
-  @[Retour::Get("/{repo_owner}/{repo_name}/runs/{job_id:[0-9]+}.txt")]
-  def logs_by_job(ctx, repo_owner : String, repo_name : String, job_id : String | Int64, h : String? = nil)
+  @[Retour::Get("/{repo_owner}/{repo_name}/runs/{job_id:[0-9]+}{txt:\\.txt}")]
+  @[Retour::Get("/{repo_owner}/{repo_name}/runs/{job_id:[0-9]+}")]
+  def by_job(ctx, repo_owner : String, repo_name : String, job_id : String | Int64, h : String? = nil, txt : String? = nil)
     job_id = job_id.to_i64 rescue raise HTTPException.new(:NotFound)
     h = ctx.request.query_params["h"]? if ctx
     token, h = RepoInstallation.verified_token(@db, repo_owner, repo_name, h: h)
@@ -480,7 +528,20 @@ class NightlyLink
       end
       raise e
     end
-    raise HTTPException.redirect(tmp_link)
+    if txt
+      raise HTTPException.redirect(tmp_link)
+    end
+
+    canonical = abs_url(NightlyLink.gen_by_job(repo_owner: repo_owner, repo_name: repo_name, job_id: job_id))
+    title = {"Repository #{repo_owner}/#{repo_name}", "Job ##{job_id}"}
+    links = {
+      ArtifactLink.new(canonical + ".txt"),
+      ArtifactLink.new(tmp_link, "Ephemeral link to logs (expires in <1 minute)"),
+      ArtifactLink.new(github_job_link(repo_owner, repo_name, job_id), "View job ##{job_id}", ext: true),
+    }
+    ctx.response.content_type = "text/html"
+    ECR.embed("templates/head.html", ctx.response)
+    ECR.embed("templates/job.html", ctx.response)
   end
 
   {% for path, i in ["github-markdown.css", "logo.svg"] %}
