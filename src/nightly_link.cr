@@ -136,6 +136,29 @@ private def github_actions_link(repo_owner : String, repo_name : String, *, even
   })
 end
 
+module GitHubRoutes
+  extend self
+  include Retour::HTTPRouter
+
+  @[Retour::Get("/{repo_owner}/{repo_name}/{_kind:blob|tree|raw|blame|commits}/{branch}/.github/workflows/{workflow:[^/]+\\.ya?ml}")]
+  def workflow_file(repo_owner, repo_name, _kind, branch, workflow, direct : Bool)
+    if branch =~ /^[0-9a-fA-F]{32,}$/
+      raise Retour::NotFound.new("Make sure you're on a branch (such as 'master'), not a commit (which '#{branch}' seems to be).")
+    end
+    NightlyLink.gen_dash_by_branch(repo_owner: repo_owner, repo_name: repo_name, workflow: workflow.rchop(".yml"), branch: branch)
+  end
+
+  @[Retour::Get("/{repo_owner}/{repo_name}/suites/{check_suite_id:[0-9]+}/artifacts/{artifact_id:[0-9]+}")]
+  def artifact_download(repo_owner, repo_name, check_suite_id, artifact_id, direct : Bool)
+    NightlyLink.gen_by_artifact(repo_owner: repo_owner, repo_name: repo_name, artifact_id: artifact_id, zip: direct)
+  end
+
+  @[Retour::Get("/{repo_owner}/{repo_name}/commit/{commit:[0-9a-fA-F]{40}}/checks/{job_id:[0-9]+}/logs")]
+  def logs_download(repo_owner, repo_name, commit, job_id, direct : Bool)
+    NightlyLink.gen_logs_by_job(repo_owner: repo_owner, repo_name: repo_name, job_id: job_id)
+  end
+end
+
 class NightlyLink
   include Retour::HTTPRouter
 
@@ -164,10 +187,6 @@ class NightlyLink
     %r(^https?://github.com/(#{repo_owner})/(#{repo_name})/(blob|tree|raw|blame|commits)/([^/]+)/\.github/workflows/([^/]+\.ya?ml)(#.*)?$)
   end
 
-  def workflow_pattern : Regex
-    %r(^https?://github.com/([^/]+)/([^/]+)/(blob|tree|raw|blame|commits)/([^/]+)/\.github/workflows/([^/]+\.ya?ml)(#.*)?$)
-  end
-
   def workflow_placeholder(repo_owner = "$user", repo_name = "$repo") : String
     "https://github.com/#{repo_owner}/#{repo_name}/blob/$branch/.github/workflows/$workflow.yml"
   end
@@ -179,17 +198,11 @@ class NightlyLink
 
     messages = [] of String
     if url
-      if url =~ workflow_pattern
-        repo_owner, repo_name, branch, workflow = $1, $2, $4, $5
-        if branch =~ /^[0-9a-fA-F]{32,}$/
-          messages.unshift("Make sure you're on a branch (such as 'master'), not a commit (which '#{$0}' seems to be).")
-        else
-          link = abs_url(NightlyLink.gen_dash_by_branch(repo_owner: repo_owner, repo_name: repo_name, workflow: workflow.rchop(".yml"), branch: branch))
-          link += "?h=#{h}" if h
-          raise HTTPException.redirect(link)
-        end
+      begin
+        raise HTTPException.redirect(GitHubRoutes.call("GET", url.lchop("https://github.com"), direct: false))
+      rescue e : Retour::NotFound
+        messages << "Did not detect a link to a GitHub workflow file." << e.to_s # TODO
       end
-      messages.unshift("Did not detect a link to a GitHub workflow file.")
     end
 
     canonical = abs_url(NightlyLink.gen_index)
@@ -390,7 +403,6 @@ class NightlyLink
     return result
   end
 
-  @[Retour::Get("/{repo_owner}/{repo_name}/suites/{check_suite_id:[0-9]+}/artifacts/{artifact_id:[0-9]+}{zip:}")]
   @[Retour::Get("/{repo_owner}/{repo_name}/actions/artifacts/{artifact_id:[0-9]+}{zip:\\.zip}")]
   @[Retour::Get("/{repo_owner}/{repo_name}/actions/artifacts/{artifact_id:[0-9]+}")]
   def by_artifact(ctx, repo_owner : String, repo_name : String, artifact_id : String | Int64, check_suite_id : String | Int64? = nil, h : String? = nil, zip : String? = nil)
@@ -446,8 +458,8 @@ class NightlyLink
     end
   end
 
-  @[Retour::Get("/{repo_owner}/{repo_name}/commit/{commit:[0-9a-fA-F]{40}}/checks/{job_id:[0-9]+}/logs")]
-  def logs_by_job(ctx, repo_owner : String, repo_name : String, commit : String?, job_id : String | Int64, h : String? = nil)
+  @[Retour::Get("/{repo_owner}/{repo_name}/runs/{job_id:[0-9]+}.txt")]
+  def logs_by_job(ctx, repo_owner : String, repo_name : String, job_id : String | Int64, h : String? = nil)
     job_id = job_id.to_i64 rescue raise HTTPException.new(:NotFound)
     h = ctx.request.query_params["h"]? if ctx
     token, h = RepoInstallation.verified_token(@db, repo_owner, repo_name, h: h)
@@ -490,7 +502,11 @@ class NightlyLink
     call(ctx, ctx)
   rescue exception
     if exception.is_a?(Retour::NotFound)
-      exception = HTTPException.new(:NotFound, exception.to_s)
+      if (new_path = GitHubRoutes.call(ctx, direct: true) rescue nil)
+        exception = HTTPException.redirect(new_path)
+      else
+        exception = HTTPException.new(:NotFound, exception.to_s)
+      end
     elsif !exception.is_a?(HTTPException)
       raise exception if reraise
       Log.error(exception: exception) { }

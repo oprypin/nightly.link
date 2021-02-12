@@ -7,16 +7,26 @@
   (optional, other than for private repos; feel free to <a href="https://github.com/settings/apps/authorizations" target="_blank">revoke</a> this anytime)
 </form>
 
-<h2>Get a link to a repository's latest artifact</h2>
-
+<h2>Paste a GitHub link, get a nightly.link!</h3>
 <form action="/">
-  <label>Insert the GitHub URL of a workflow file that uses <a href="https://github.com/actions/upload-artifact#readme">actions/upload-artifact</a>:<br/>
-  <input name="url" required pattern="<%= HTML.escape(workflow_pattern.source) %>" placeholder="<%= HTML.escape(workflow_placeholder) %>" <% if url %>value="<%= HTML.escape(url.not_nil!) %>"<% end %> style="width: 80%"></label>
+  <input name="url" required pattern="^https://github.com<%= HTML.escape(GitHubRoutes._get_regex.source) %>$" <% if url %>value="<%= HTML.escape(url) %>"<% end %> style="width: 80%"></label>
   <input type="submit" value="Get links">
   <% if h %><input type="hidden" name="h" value="<%= h %>"><% end %>
   <% messages.each do |message| %>
     <p style="color: maroon"><%= HTML.escape(message) %></p>
   <% end %>
+</form>
+<% if messages.empty? %>
+  <p>Continue reading to see what you can do with this.</p>
+<% else %>
+  <p>Please check below for recognized link formats:</p>
+<% end %>
+
+<h2>Get a link to a repository's latest artifact</h2>
+<form action="/">
+  <label>Insert the GitHub URL of a workflow file that uses <a href="https://github.com/actions/upload-artifact#readme">actions/upload-artifact</a>:<br/>
+  <input name="url" required placeholder="<%= HTML.escape(workflow_placeholder) %>" <% if url %>value="<%= HTML.escape(url.not_nil!) %>"<% end %> style="width: 80%"></label>
+  <input type="submit" value="Get links">
 </form>
 <% if example_workflow && example_art && example_dest %>
 <p>Example: <a href="<%= HTML.escape(example_workflow) %>" target="_blank"><%= HTML.escape(example_workflow) %></a></p>

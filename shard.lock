@@ -38,7 +38,7 @@ shards:
 
   retour:
     git: https://github.com/oprypin/retour.git
-    version: 0.1.0+git.commit.e049bbd0bf8abbe2f2451a8db7dc028fd1776955
+    version: 0.1.0+git.commit.0665577f99f48dfcf13e146f2fc53455ea64c1dd
 
   spec_assert:
     git: https://github.com/oprypin/spec-assert.git
@@ -55,4 +55,3 @@ shards:
   webmock:
     git: https://github.com/manastech/webmock.cr.git
     version: 0.14.0
-
