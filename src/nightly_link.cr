@@ -544,7 +544,7 @@ class NightlyLink
     ECR.embed("templates/job.html", ctx.response)
   end
 
-  {% for path, i in ["github-markdown.css", "logo.svg"] %}
+  {% for path, i in ["style.css", "logo.svg"] %}
     {% ext = path.split(".")[-1] %}
     {% headers = "#{ext.upcase.id}_HEADERS".id %}
     {{headers}} = HTTP::Headers{

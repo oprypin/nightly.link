@@ -3,7 +3,7 @@ release ?=
 
 md_files = $(wildcard *.md)
 html_files := $(md_files:.md=.html)
-vendored_files := github-markdown.css
+vendored_files := style.css
 all_sources := src/nightly_link.cr $(wildcard src/*.cr) $(html_files) $(wildcard templates/*.html) $(vendored_files)
 
 nightly_link: $(all_sources)
@@ -15,8 +15,11 @@ render_md: src/render_md.cr
 %.html: %.md render_md
 	./render_md $< > $@
 
-github-markdown.css:
-	curl https://cdnjs.cloudflare.com/ajax/libs/github-markdown-css/4.0.0/github-markdown.css | sed 's/\.markdown-body/body/' >github-markdown.css
+style.css: assets/style.css Makefile
+	(cat assets/style.css && \
+	 echo '/* https://github.com/sindresorhus/github-markdown-css */' && \
+	 curl https://cdnjs.cloudflare.com/ajax/libs/github-markdown-css/4.0.0/github-markdown.css | sed 's/\.markdown-body/body/' \
+	) >style.css
 
 lib: shard.lock
 	shards install
