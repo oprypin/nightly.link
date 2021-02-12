@@ -199,7 +199,7 @@ class NightlyLink
 
     ctx.response.content_type = "text/html"
     ECR.embed("templates/head.html", ctx.response)
-    ctx.response << "<title>nightly.link</title>"
+    ctx.response.puts("<title>nightly.link</title>")
     ECR.embed("README.html", ctx.response)
   end
 
@@ -471,7 +471,7 @@ class NightlyLink
     raise HTTPException.redirect(tmp_link)
   end
 
-  {% for path, i in ["github-markdown.min.css", "logo.svg"] %}
+  {% for path, i in ["github-markdown.css", "logo.svg"] %}
     {% ext = path.split(".")[-1] %}
     {% headers = "#{ext.upcase.id}_HEADERS".id %}
     {{headers}} = HTTP::Headers{
