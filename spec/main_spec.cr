@@ -196,9 +196,11 @@ end
 
 describe "static" do
   test "logo" do
-    resp, body = serve("/logo.svg")
-    assert resp.status == HTTP::Status::OK
-    assert resp.headers["Content-Type"] == "image/svg+xml"
+    ["/logo.svg", NightlyLink.gen_logo].each do |path|
+      resp, body = serve(path)
+      assert resp.status == HTTP::Status::OK
+      assert resp.headers["Content-Type"] == "image/svg+xml"
+    end
   end
 end
 

@@ -544,7 +544,7 @@ class NightlyLink
     ECR.embed("templates/job.html", ctx.response)
   end
 
-  {% for path, i in ["style.css", "logo.svg"] %}
+  {% for name, path in {style: "style.css", logo: "logo.svg"} %}
     {% ext = path.split(".")[-1] %}
     {% headers = "#{ext.upcase.id}_HEADERS".id %}
     {{headers}} = HTTP::Headers{
@@ -553,9 +553,13 @@ class NightlyLink
     }
 
     @[Retour::Get({{"/#{path.id}"}})]
-    def static{{i}}(ctx)
+    def static_{{name}}(ctx)
       ctx.response.headers.merge!({{headers}})
       ctx.response << {{read_file(path.id)}}
+    end
+
+    def self.gen_{{name}}
+      {{"/#{path.id}?#{`sha1sum #{path}`[0...10]}"}}
     end
   {% end %}
 

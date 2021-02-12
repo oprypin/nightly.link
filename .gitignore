@@ -12,6 +12,8 @@
 !/spec/*.cr
 !/templates/
 !/templates/*.html
+!/assets
+!/assets/*
 !/.github/
 !/.github/workflows
 !/.github/workflows/*.yml
