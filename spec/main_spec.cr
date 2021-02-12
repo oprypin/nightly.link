@@ -37,7 +37,7 @@ describe "index" do
   test "redirect" do
     resp, body = serve("/?url=https://github.com/oprypin/nightly.link/blob/master/.github/workflows/upload-test.yml")
     assert resp.status == HTTP::Status::FOUND
-    assert resp.headers["Location"] == "https://nightly.link/oprypin/nightly.link/workflows/upload-test/master"
+    assert resp.headers["Location"] == "/oprypin/nightly.link/workflows/upload-test/master"
   end
 
   test "bad url" do
@@ -182,7 +182,7 @@ describe "by_artifact" do
   test "zip2" do
     resp, body = serve("/UserName/RepoName/suites/#{CHECK_SUITE_1}/artifacts/#{ARTIFACT_1}")
     assert resp.status == HTTP::Status::FOUND
-    assert resp.headers["Location"] == "http://example.org/download1"
+    assert resp.headers["Location"] == "/UserName/RepoName/actions/artifacts/87654321.zip"
   end
 
   test "no double zip" do
