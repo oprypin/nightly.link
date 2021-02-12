@@ -289,12 +289,33 @@ struct Artifact
     repo_owner = repo_owner.downcase
     repo_name = repo_name.downcase
     @@cache_zip_by_id.fetch({repo_owner, repo_name, artifact_id}, expires_in: 50.seconds) do
-      # https://docs.github.com/en/free-pro-team@latest/rest/reference/actions#download-an-artifact
+      # https://docs.github.com/en/rest/reference/actions#download-an-artifact
       resp = GitHub.get(
         "repos/#{repo_owner}/#{repo_name}/actions/artifacts/#{artifact_id}/zip",
         headers: {Authorization: token}
       )
-      if resp.status_code == 500 && resp.body.includes?("Failed to generate URL to download artifact")
+      if resp.status_code == 410 || (resp.status_code == 500 && resp.body.includes?("Failed to generate URL to download artifact"))
+        raise GitHubArtifactDownloadError.new(status_code: resp.status_code, uri: resp.uri)
+      end
+      resp.raise_for_status
+      resp.headers["location"]
+    end
+  end
+end
+
+struct Logs
+  @@cache_raw_by_id = CleanedMemoryCache({String, String, Int64}, String).new
+
+  def self.raw_by_id(repo_owner : String, repo_name : String, job_id : Int64, token : InstallationToken | UserToken) : String
+    repo_owner = repo_owner.downcase
+    repo_name = repo_name.downcase
+    @@cache_raw_by_id.fetch({repo_owner, repo_name, job_id}, expires_in: 50.seconds) do
+      # https://docs.github.com/en/rest/reference/actions#download-job-logs-for-a-workflow-run
+      resp = GitHub.get(
+        "repos/#{repo_owner}/#{repo_name}/actions/jobs/#{job_id}/logs",
+        headers: {Authorization: token}
+      )
+      if resp.status_code == 410
         raise GitHubArtifactDownloadError.new(status_code: resp.status_code, uri: resp.uri)
       end
       resp.raise_for_status

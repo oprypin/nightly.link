@@ -122,6 +122,10 @@ record RepoInstallation,
   end
 end
 
+private def github_job_link(repo_owner : String, repo_name : String, job_id : Int64) : String
+  "https://github.com/#{repo_owner}/#{repo_name}/runs/#{job_id}"
+end
+
 private def github_run_link(repo_owner : String, repo_name : String, run_id : Int64) : String
   "https://github.com/#{repo_owner}/#{repo_name}/actions/runs/#{run_id}#artifacts"
 end
@@ -440,6 +444,31 @@ class NightlyLink
       ECR.embed("templates/head.html", ctx.response)
       ECR.embed("templates/artifact.html", ctx.response)
     end
+  end
+
+  @[Retour::Get("/{repo_owner}/{repo_name}/commit/{commit:[0-9a-fA-F]{40}}/checks/{job_id:[0-9]+}/logs")]
+  def logs_by_job(ctx, repo_owner : String, repo_name : String, commit : String?, job_id : String | Int64, h : String? = nil)
+    job_id = job_id.to_i64 rescue raise HTTPException.new(:NotFound)
+    h = ctx.request.query_params["h"]? if ctx
+    token, h = RepoInstallation.verified_token(@db, repo_owner, repo_name, h: h)
+
+    gh_link = github_job_link(repo_owner, repo_name, job_id)
+    tmp_link = begin
+      Logs.raw_by_id(repo_owner, repo_name, job_id, token: token)
+    rescue e : GitHubArtifactDownloadError
+      raise HTTPException.new(:NotFound,
+        "It seems that the logs for job ##{job_id} have expired.\n" +
+        "Check on GitHub: <#{gh_link}>"
+      )
+    rescue e : Halite::Exception::ClientError
+      if e.status_code.in?(401, 404)
+        raise HTTPException.new(:NotFound,
+          "Job ##{job_id} not found.\nCheck on GitHub: <#{gh_link}>"
+        )
+      end
+      raise e
+    end
+    raise HTTPException.redirect(tmp_link)
   end
 
   {% for path, i in ["github-markdown.min.css", "logo.svg"] %}
