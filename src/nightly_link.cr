@@ -333,6 +333,10 @@ class NightlyLink
         repo_owner: repo_owner, repo_name: repo_name, workflow: workflow.rchop(".yml"), branch: branch, artifact: art.name
       )), art.name, h: h)
     end
+    if links.size == 1
+      raise HTTPException.redirect(links[0].url)
+    end
+
     title = {"Repository #{repo_owner}/#{repo_name}", "Workflow #{workflow} | Branch #{branch}"}
     canonical = abs_url(NightlyLink.gen_dash_by_branch(
       repo_owner: repo_owner, repo_name: repo_name, workflow: workflow.rchop(".yml"), branch: branch
