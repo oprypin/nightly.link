@@ -12,7 +12,7 @@
     <% links.each_with_index do |link, i| %>
       <% if link.ext == ext %>
         <li>
-          <% if !ext && i == 0 %><b><% end %><a href="<%= HTML.escape(link.url) %>"<% if ext %> rel="nofollow" target="_blank"<% end %>><%= HTML.escape(link.title || link.url) %></a><% if !ext && i == 0 %></b><% end %>
+          <% if !ext && i == 0 %><b><% end %><a rel="nofollow" href="<%= HTML.escape(link.url) %>"<% if ext %> target="_blank"<% end %>><%= HTML.escape(link.title || link.url) %></a><% if !ext && i == 0 %></b><% end %>
         </li>
       <% end %>
     <% end %>

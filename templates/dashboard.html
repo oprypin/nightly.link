@@ -13,7 +13,7 @@
       <% any = true %>
       <% repo = "#{inst.repo_owner}/#{repo_name}" %>
       <li>
-        <a href="<%= HTML.escape("https://github.com/#{inst.repo_owner}/#{repo_name}") %>" rel="nofollow" target="_blank"><%= HTML.escape(repo) %></a>
+        <a rel="nofollow" target="_blank" href="<%= HTML.escape("https://github.com/#{inst.repo_owner}/#{repo_name}") %>"><%= HTML.escape(repo) %></a>
         <form action="/">
           <label>Insert the GitHub URL of a workflow file that uses <code>upload-artifact</code>:<br/>
           <input name="url" required pattern="<%= HTML.escape(workflow_pattern(inst.repo_owner, repo_name).source) %>" placeholder="<%= HTML.escape(workflow_placeholder(inst.repo_owner, repo_name)) %>" style="width: 80%"></label>

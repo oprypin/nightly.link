@@ -8,7 +8,7 @@
 <p>Choose one of the artifacts:</p>
 <table>
   <% links.each do |link| %>
-    <tr><th><a href="<%= HTML.escape(link.url) %>"><%= HTML.escape(link.title) %></a></th>
-    <td><a href="<%= HTML.escape(link.url) %>.zip"><%= HTML.escape(link.url) %>.zip</a></td></tr>
+    <tr><th><a rel="nofollow" href="<%= HTML.escape(link.url) %>"><%= HTML.escape(link.title) %></a></th>
+    <td><a rel="nofollow" href="<%= HTML.escape(link.url) %>.zip"><%= HTML.escape(link.url) %>.zip</a></td></tr>
   <% end %>
 </table>
