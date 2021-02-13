@@ -3,4 +3,4 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <link rel="stylesheet" href="<%= NightlyLink.gen_style %>">
 <link rel="icon" href="/logo.svg" type="image/svg+xml">
-<% if canonical %><link rel="canonical" href="<%= canonical %>"><% end %>
+<% if canonical %><link rel="canonical" href="<%= HTML.escape(canonical) %>"><% end %>

@@ -42,7 +42,7 @@ shards:
 
   spec_assert:
     git: https://github.com/oprypin/spec-assert.git
-    version: 0.1.0+git.commit.96c61f47212daed5277f8bba236a271fab627067
+    version: 0.1.0+git.commit.a5d589716e075deaf5a106a169f528e3a47a04a3
 
   sqlite3:
     git: https://github.com/crystal-lang/crystal-sqlite3.git

@@ -25,7 +25,7 @@
 <details>
 <summary>Link to a repository's latest artifact</summary>
 <p>Insert the GitHub URL of a workflow file that uses <a target="_blank" href="https://github.com/actions/upload-artifact#readme">actions/upload-artifact</a>.<br/>
-Example: <a target="_blank" class="example" href="<%= HTML.escape(example_workflow) %>"><%= HTML.escape(example_workflow) %></a></p>
+Example: <a class="example" target="_blank" href="<%= HTML.escape(example_workflow) %>"><%= HTML.escape(example_workflow) %></a></p>
 <p>Following this form (and having selected the "<%= example_art %>" artifact), you will end up at<br><a rel="nofollow" href="<%= example_dest %>"><%= example_dest %></a> [<a rel="nofollow" href="<%= example_dest %>.zip">.zip</a>]<br>
 which is a link that always downloads the latest artifact from a <u>succeeding</u> run on that <u>repo</u>+<u>workflow</u>+<u>branch</u>.</p>
 <p>If you have several workflows or branches, you can adapt the URL by hand in a predictable way.</p>
@@ -33,7 +33,7 @@ which is a link that always downloads the latest artifact from a <u>succeeding</
 
 <details>
 <summary>Link to a particular artifact</summary>
-<p>If GitHub gave you a link such as <a target="_blank" rel="nofollow" class="example" href="<%= HTML.escape("https://github.com" + example_art_link) %>"><%= HTML.escape("https://github.com" + example_art_link) %></a>,<br>
+<p>If GitHub gave you a link such as <a class="example" target="_blank" rel="nofollow" href="<%= HTML.escape("https://github.com" + example_art_link) %>"><%= HTML.escape("https://github.com" + example_art_link) %></a>,<br>
 you can just change the prefix to <a target="_blank" rel="nofollow" href="<%= HTML.escape(abs_url example_art_link) %>"><%= HTML.escape(abs_url example_art_link) %></a>,<br>
 and you get a download URL that works the same but doesn't give a "404" error to users who aren't logged into GitHub.</p>
 <p>Or, paste it into the field above.</p>
@@ -42,11 +42,11 @@ and you get a download URL that works the same but doesn't give a "404" error to
 <details>
 <summary>Extra links for a particular run</summary>
 <p>A <i>run</i> is basically a collection of <i>jobs</i>. Even though it's the job that produces artifacts, they get associated with the parent run.</p>
-<p>Example run: <a target="_blank" rel="nofollow" class="example" href="<%= HTML.escape("https://github.com" + example_run_link) %>"><%= HTML.escape("https://github.com" + example_run_link) %></a>.<br>
+<p>Example run: <a class="example" target="_blank" rel="nofollow" href="<%= HTML.escape("https://github.com" + example_run_link) %>"><%= HTML.escape("https://github.com" + example_run_link) %></a>.<br>
 You <i>have to</i> provide the <i>run</i> to <u>nightly.link</u> if you want to find the artifacts.<br>
 Again, you can just change the prefix like <a target="_blank" rel="nofollow" href="<%= HTML.escape(abs_url example_run_link) %>"><%= HTML.escape(abs_url example_run_link) %></a> to get there.<br>
 <p>If, instead, you click into a <i>job</i>, you can access its logs. The raw log download link is in the same situation as artifacts: <u>nightly.link</u> is needed to make them work for anonymous users. It accepts both the run's URL itself, and the link that you can get from the "View raw logs" item.<br>
-Example job: <a target="_blank" rel="nofollow" class="example" href="https://github.com/oprypin/nightly.link/runs/1849327344?check_suite_focus=true">https://github.com/oprypin/nightly.link/runs/1849327344?check_suite_focus=true</a>
+Example job: <a class="example" target="_blank" rel="nofollow" href="https://github.com/oprypin/nightly.link/runs/1849327325?check_suite_focus=true">https://github.com/oprypin/nightly.link/runs/1849327325?check_suite_focus=true</a>
 </details>
 
 <script>

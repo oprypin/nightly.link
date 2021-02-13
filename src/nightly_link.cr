@@ -314,12 +314,14 @@ class NightlyLink
       )
     end
 
-    title = {"Repository #{repo_owner}/#{repo_name}", "Workflow #{workflow} | Branch #{branch}"}
     links = artifacts.map do |art|
+      repo_owner = art.repository.owner
+      repo_name = art.repository.name
       link = abs_url(NightlyLink.gen_by_branch(repo_owner: repo_owner, repo_name: repo_name, workflow: workflow.rchop(".yml"), branch: branch, artifact: art.name))
       link += "?h=#{h}" if h
       Link.new(link, art.name)
     end
+    title = {"Repository #{repo_owner}/#{repo_name}", "Workflow #{workflow} | Branch #{branch}"}
     canonical = abs_url(NightlyLink.gen_dash_by_branch(repo_owner: repo_owner, repo_name: repo_name, workflow: workflow.rchop(".yml"), branch: branch))
     canonical += "?h=#{h}" if h
 
@@ -350,12 +352,14 @@ class NightlyLink
       )
     end
 
-    title = {"Repository #{repo_owner}/#{repo_name}", "Run ##{run_id}"}
     links = artifacts.map do |art|
+      repo_owner = art.repository.owner
+      repo_name = art.repository.name
       link = abs_url(NightlyLink.gen_by_run(repo_owner: repo_owner, repo_name: repo_name, run_id: run_id, artifact: art.name))
       link += "?h=#{h}" if h
       Link.new(link, art.name)
     end
+    title = {"Repository #{repo_owner}/#{repo_name}", "Run ##{run_id}"}
     canonical = abs_url(NightlyLink.gen_dash_by_run(repo_owner: repo_owner, repo_name: repo_name, run_id: run_id))
     canonical += "?h=#{h}" if h
     message = nil
@@ -456,6 +460,7 @@ class NightlyLink
     )
     link = abs_url(NightlyLink.gen_by_run(repo_owner: repo_owner, repo_name: repo_name, run_id: run_id, artifact: artifact))
     result.links << ArtifactLink.new("#{link}#{"?h=#{h}" if h}", result.title[1], zip: "#{link}.zip#{"?h=#{h}" if h}")
+
     return artifact_page(ctx, result, !!zip) if ctx
     return result
   end
@@ -543,12 +548,13 @@ class NightlyLink
     end
 
     canonical = abs_url(NightlyLink.gen_by_job(repo_owner: repo_owner, repo_name: repo_name, job_id: job_id))
-    title = {"Repository #{repo_owner}/#{repo_name}", "Job ##{job_id}"}
     links = {
       ArtifactLink.new(canonical + ".txt"),
       ArtifactLink.new(tmp_link, "Ephemeral link to logs (expires in <1 minute)"),
       ArtifactLink.new(github_job_link(repo_owner, repo_name, job_id), "View job ##{job_id}", ext: true),
     }
+    title = {"Repository #{repo_owner}/#{repo_name}", "Job ##{job_id}"}
+
     ctx.response.content_type = "text/html"
     ECR.embed("templates/head.html", ctx.response)
     ECR.embed("templates/job.html", ctx.response)
