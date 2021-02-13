@@ -36,7 +36,7 @@ macro assert_contents(links)
   %offset = 0
   %links = ({{links}}).map do |s|
     body.index(s, %offset).tap do |r|
-      offset = r + 1 if r
+      %offset = r + 1 if r
     end
   end
   assert %links.compact == %links
@@ -160,6 +160,7 @@ describe "dash_by_branch" do
       "Repository UserName/RepoName", "Workflow SomeWorkflow.yml | Branch SomeBranch",
       "https://nightly.link/UserName/RepoName/workflows/SomeWorkflow/SomeBranch/SomeArtifact",
       "https://nightly.link/UserName/RepoName/workflows/SomeWorkflow/SomeBranch/SomeArtifact.zip",
+      "https://nightly.link/UserName/RepoName/workflows/SomeWorkflow/SomeBranch/SomeArtifact.zip",
     ]
   end
 
@@ -168,8 +169,7 @@ describe "dash_by_branch" do
       resp, body = serve("/#{PRIVATE_REPO}/workflows/SomeWorkflow/SomeBranch")
       assert resp.status == HTTP::Status::NOT_FOUND
       assert_contents [
-        "Repository not found:",
-        "https://github.com/#{PRIVATE_REPO}",
+        "Repository not found:", "https://github.com/#{PRIVATE_REPO}",
       ]
     end
 
@@ -177,12 +177,11 @@ describe "dash_by_branch" do
       resp, body = serve("/#{PRIVATE_REPO}/workflows/SomeWorkflow/SomeBranch?h=4007f0bdefca32af97b5abbe49644bd3155fe6aa")
       assert resp.status == HTTP::Status::NOT_FOUND
       assert_contents [
-        "Repository not found:",
-        "https://github.com/#{PRIVATE_REPO}",
+        "Repository not found:", "https://github.com/#{PRIVATE_REPO}",
       ]
     end
 
-    pending do
+    it do
       WebMock.stub(:get, "https://api.github.com/repos/#{PRIVATE_REPO}/actions/workflows/SomeWorkflow.yml/runs?per_page=1&branch=SomeBranch&event=push&status=success").to_return(
         body: %({"workflow_runs":[
                 {"id":#{RUN_1},"event":"push","workflow_id":#{WORKFLOW_1},"check_suite_url":"https://api.github.com/repos/#{PRIVATE_REPO}/check-suites/#{CHECK_SUITE_1}","updated_at":"2020-12-19T22:22:22Z","repository":{"full_name":"#{PRIVATE_REPO}","private":false,"fork":false}}]}))
@@ -195,9 +194,10 @@ describe "dash_by_branch" do
       resp, body = serve("/#{PRIVATE_REPO}/workflows/SomeWorkflow/SomeBranch?h=6c9bf24563d1896f5de321ce6043413f8c75ef16")
       assert_canonical "https://nightly.link/#{PRIVATE_REPO}/workflows/SomeWorkflow/SomeBranch?h=6c9bf24563d1896f5de321ce6043413f8c75ef16"
       assert_contents [
-        "Repository #{PRIVATE_REPO}",
-        "Workflow SomeWorkflow.yml | Branch SomeBranch",
+        "Repository #{PRIVATE_REPO}", "Workflow SomeWorkflow.yml | Branch SomeBranch",
+        "Repository #{PRIVATE_REPO}", "Workflow SomeWorkflow.yml | Branch SomeBranch",
         "https://nightly.link/#{PRIVATE_REPO}/workflows/SomeWorkflow/SomeBranch/SomeArtifact?h=6c9bf24563d1896f5de321ce6043413f8c75ef16",
+        "https://nightly.link/#{PRIVATE_REPO}/workflows/SomeWorkflow/SomeBranch/SomeArtifact.zip?h=6c9bf24563d1896f5de321ce6043413f8c75ef16",
         "https://nightly.link/#{PRIVATE_REPO}/workflows/SomeWorkflow/SomeBranch/SomeArtifact.zip?h=6c9bf24563d1896f5de321ce6043413f8c75ef16",
       ]
     end
@@ -219,9 +219,10 @@ describe "dash_by_branch" do
     resp, body = serve("/UserName/RepoName/workflows/SomeWorkflow.yaml/SomeBranch")
     assert_canonical "https://nightly.link/UserName/RepoName/workflows/SomeWorkflow.yaml/SomeBranch"
     assert_contents [
-      "Repository UserName/RepoName",
-      "Workflow SomeWorkflow.yaml | Branch SomeBranch",
+      "Repository UserName/RepoName", "Workflow SomeWorkflow.yaml | Branch SomeBranch",
+      "Repository UserName/RepoName", "Workflow SomeWorkflow.yaml | Branch SomeBranch",
       "https://nightly.link/UserName/RepoName/workflows/SomeWorkflow.yaml/SomeBranch/SomeArtifact",
+      "https://nightly.link/UserName/RepoName/workflows/SomeWorkflow.yaml/SomeBranch/SomeArtifact.zip",
       "https://nightly.link/UserName/RepoName/workflows/SomeWorkflow.yaml/SomeBranch/SomeArtifact.zip",
     ]
   end
@@ -237,9 +238,10 @@ describe "dash_by_run" do
     resp, body = serve("/uSerName/RepoName/actions/runs/#{RUN_1}")
     assert_canonical "https://nightly.link/UserName/RepoName/actions/runs/#{RUN_1}"
     assert_contents [
-      "Repository UserName/RepoName",
-      "Run #987654321",
+      "Repository UserName/RepoName", "Run #987654321",
+      "Repository UserName/RepoName", "Run #987654321",
       "https://nightly.link/UserName/RepoName/actions/runs/987654321/SomeArtifact",
+      "https://nightly.link/UserName/RepoName/actions/runs/987654321/SomeArtifact.zip",
       "https://nightly.link/UserName/RepoName/actions/runs/987654321/SomeArtifact.zip",
     ]
   end

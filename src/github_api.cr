@@ -135,7 +135,7 @@ struct Installations
   property installations : Array(Installation)
 
   def self.for_user(token : UserToken, & : Installation ->)
-    # https://docs.github.com/v3/apps#list-app-installations-accessible-to-the-user-access-token
+    # https://docs.github.com/en/rest/reference/apps#list-app-installations-accessible-to-the-user-access-token
     get_json_list(
       Installations, "user/installations",
       headers: {Authorization: token}, max_items: 10
@@ -143,7 +143,7 @@ struct Installations
   end
 
   def self.for_app(token : AppToken, since : Time? = nil, & : Installation ->)
-    # https://docs.github.com/v3/apps#list-installations-for-the-authenticated-app
+    # https://docs.github.com/en/rest/reference/apps#list-installations-for-the-authenticated-app
     params = {since: since && (since + 1.millisecond).to_rfc3339(fraction_digits: 3)}
     get_json_list(
       Array(Installation), "app/installations", params: params,
@@ -170,7 +170,7 @@ struct Installation
   property updated_at : Time
 
   def self.for_id(id : InstallationId, token : AppToken) : Installation
-    # https://docs.github.com/v3/apps#get-an-installation-for-the-authenticated-app
+    # https://docs.github.com/en/rest/reference/apps#get-an-installation-for-the-authenticated-app
     resp = GitHub.get("app/installations/#{id}", headers: {Authorization: token})
     resp.raise_for_status
     Installation.from_json(resp.body).tap { |r| Log.debug { r.to_json } }
@@ -194,7 +194,7 @@ struct Repositories
   property repositories : Array(Repository)
 
   cached_array def self.for_installation(installation_id : InstallationId, token : UserToken, & : Repository ->)
-    # https://docs.github.com/v3/apps#list-repositories-accessible-to-the-user-access-token
+    # https://docs.github.com/en/rest/reference/apps#list-repositories-accessible-to-the-user-access-token
     get_json_list(
       Repositories, "user/installations/#{installation_id}/repositories",
       headers: {Authorization: token}, max_items: 300
@@ -202,7 +202,7 @@ struct Repositories
   end
 
   cached_array def self.for_installation(token : InstallationToken, & : Repository ->)
-    # https://docs.github.com/v3/apps#list-repositories-accessible-to-the-app-installation
+    # https://docs.github.com/en/rest/reference/apps#list-repositories-accessible-to-the-app-installation
     get_json_list(
       Repositories, "installation/repositories",
       headers: {Authorization: token}, max_items: 300
@@ -232,7 +232,10 @@ struct WorkflowRuns
   include JSON::Serializable
   property workflow_runs : Array(WorkflowRun)
 
-  cached_array def self.for_workflow(repo_owner : DowncaseString, repo_name : DowncaseString, workflow : String, branch : String, event : String, token : InstallationToken | UserToken, max_items : Int32, & : WorkflowRun ->)
+  cached_array def self.for_workflow(
+    repo_owner : DowncaseString, repo_name : DowncaseString, workflow : String, branch : String, event : String,
+    token : InstallationToken | UserToken, max_items : Int32, & : WorkflowRun ->
+  )
     # https://docs.github.com/v3/actions#list-workflow-runs
     get_json_list(
       WorkflowRuns, "repos/#{repo_owner}/#{repo_name}/actions/workflows/#{workflow}/runs",
@@ -261,7 +264,10 @@ struct Artifacts
   include JSON::Serializable
   property artifacts : Array(Artifact)
 
-  cached_array def self.for_run(repo_owner : DowncaseString, repo_name : DowncaseString, run_id : Int64, token : InstallationToken | UserToken, & : Artifact ->)
+  cached_array def self.for_run(
+    repo_owner : DowncaseString, repo_name : DowncaseString, run_id : Int64,
+    token : InstallationToken | UserToken, & : Artifact ->
+  )
     # https://docs.github.com/v3/actions#list-workflow-run-artifacts
     get_json_list(
       Artifacts, "repos/#{repo_owner}/#{repo_name}/actions/runs/#{run_id}/artifacts",
@@ -289,7 +295,9 @@ struct Artifact
 
   @@cache_zip_by_id = CleanedMemoryCache({String, String, Int64}, String).new
 
-  def self.zip_by_id(repo_owner : String, repo_name : String, artifact_id : Int64, token : InstallationToken | UserToken) : String
+  def self.zip_by_id(
+    repo_owner : String, repo_name : String, artifact_id : Int64, token : InstallationToken | UserToken
+  ) : String
     repo_owner = repo_owner.downcase
     repo_name = repo_name.downcase
     @@cache_zip_by_id.fetch({repo_owner, repo_name, artifact_id}, expires_in: 50.seconds) do
@@ -298,7 +306,9 @@ struct Artifact
         "repos/#{repo_owner}/#{repo_name}/actions/artifacts/#{artifact_id}/zip",
         headers: {Authorization: token}
       )
-      if resp.status_code == 410 || (resp.status_code == 500 && resp.body.includes?("Failed to generate URL to download artifact"))
+      if resp.status_code == 410 || (
+           resp.status_code == 500 && resp.body.includes?("Failed to generate URL to download artifact")
+         )
         raise GitHubArtifactDownloadError.new(status_code: resp.status_code, uri: resp.uri)
       end
       resp.raise_for_status
@@ -310,7 +320,9 @@ end
 struct Logs
   @@cache_raw_by_id = CleanedMemoryCache({String, String, Int64}, String).new
 
-  def self.raw_by_id(repo_owner : String, repo_name : String, job_id : Int64, token : InstallationToken | UserToken) : String
+  def self.raw_by_id(
+    repo_owner : String, repo_name : String, job_id : Int64, token : InstallationToken | UserToken
+  ) : String
     repo_owner = repo_owner.downcase
     repo_name = repo_name.downcase
     @@cache_raw_by_id.fetch({repo_owner, repo_name, job_id}, expires_in: 50.seconds) do
