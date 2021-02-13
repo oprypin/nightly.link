@@ -422,7 +422,7 @@ class NightlyLink
     h : String? = nil,
     ext : Bool = false do
     def title
-      @title || @url
+      @title || url
     end
 
     def url(ext : String = "")
@@ -453,7 +453,7 @@ class NightlyLink
     canonical = abs_url(NightlyLink.gen_by_branch(
       repo_owner: repo_owner, repo_name: repo_name, workflow: workflow.rchop(".yml"), branch: branch, artifact: artifact
     ))
-    links << ArtifactLink.new(canonical + ".zip", title[1], h: h)
+    links << ArtifactLink.new(canonical + ".zip", h: h)
     canonical += "?h=#{h}" if h
 
     return links if ctx.nil?
@@ -499,7 +499,7 @@ class NightlyLink
     canonical = abs_url(NightlyLink.gen_by_run(
       repo_owner: repo_owner, repo_name: repo_name, run_id: run_id, artifact: artifact
     ))
-    links << ArtifactLink.new(canonical + ".zip", title[1], h: h)
+    links << ArtifactLink.new(canonical + ".zip", h: h)
     canonical += "?h=#{h}" if h
 
     return links if ctx.nil?
@@ -555,7 +555,7 @@ class NightlyLink
     canonical = abs_url(NightlyLink.gen_by_artifact(
       repo_owner: repo_owner, repo_name: repo_name, artifact_id: artifact_id
     ))
-    links << ArtifactLink.new(canonical + ".zip", title[1], h: h)
+    links << ArtifactLink.new(canonical + ".zip", h: h)
     canonical += "?h=#{h}" if h
 
     return links if ctx.nil?

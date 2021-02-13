@@ -43,6 +43,10 @@ macro assert_contents(links)
   assert %links.compact == %links
 end
 
+macro assert_nofollow
+  assert body.partition("<title>").last !~ /(?<!rel="nofollow" )href=https:\/\/nightly.link\//
+end
+
 Spec.before_each do
   WebMock.reset
   WebMock.stub(:post, "https://api.github.com/app/installations/#{INSTALLATION_F}/access_tokens").to_return(
@@ -60,7 +64,7 @@ describe "index" do
       body: %({"artifacts":[{"id":#{ARTIFACT_1},"name":"SomeArtifact","url":"https://api.github.com/repos/UserName/RepoName/actions/artifacts/#{ARTIFACT_1}"}]}))
   end
 
-  test "page" do
+  test do
     resp, body = serve("/")
     assert_canonical "https://nightly.link/"
     assert_contents [
@@ -68,7 +72,7 @@ describe "index" do
       "/suites/#{CHECK_SUITE_1}/artifacts/#{ARTIFACT_1}",
       "/actions/runs/#{RUN_1}",
     ]
-    assert body.partition("<title>").last !~ %r((?<!rel="nofollow" )href=.https://nightly.link/)
+    assert_nofollow
   end
 
   describe "redirect" do
@@ -107,6 +111,7 @@ describe "index" do
       assert_contents [
         "select your repositories", "not detect a link",
       ]
+      assert_nofollow
     end
   end
 end
@@ -164,6 +169,7 @@ describe "dash_by_branch" do
       "https://nightly.link/UserName/RepoName/workflows/SomeWorkflow/SomeBranch/SomeArtifact.zip",
       "https://nightly.link/UserName/RepoName/workflows/SomeWorkflow/SomeBranch/SomeArtifact.zip",
     ]
+    assert_nofollow
   end
 
   describe "private" do
@@ -173,6 +179,7 @@ describe "dash_by_branch" do
       assert_contents [
         "Repository not found:", "https://github.com/#{PRIVATE_REPO}",
       ]
+      assert_nofollow
     end
 
     test "with wrong password" do
@@ -181,6 +188,7 @@ describe "dash_by_branch" do
       assert_contents [
         "Repository not found:", "https://github.com/#{PRIVATE_REPO}",
       ]
+      assert_nofollow
     end
 
     test do
@@ -201,6 +209,7 @@ describe "dash_by_branch" do
         "https://nightly.link/#{PRIVATE_REPO}/workflows/SomeWorkflow/SomeBranch/SomeArtifact?h=6c9bf24563d1896f5de321ce6043413f8c75ef16",
         "https://nightly.link/#{PRIVATE_REPO}/workflows/SomeWorkflow/SomeBranch/SomeArtifact.zip?h=6c9bf24563d1896f5de321ce6043413f8c75ef16",
       ]
+      assert_nofollow
     end
   end
 
@@ -225,6 +234,7 @@ describe "dash_by_branch" do
       "https://nightly.link/UserName/RepoName/workflows/SomeWorkflow.yaml/SomeBranch/SomeArtifact",
       "https://nightly.link/UserName/RepoName/workflows/SomeWorkflow.yaml/SomeBranch/SomeArtifact.zip",
     ]
+    assert_nofollow
   end
 end
 
@@ -244,6 +254,7 @@ describe "dash_by_run" do
       "https://nightly.link/UserName/RepoName/actions/runs/987654321/SomeArtifact.zip",
       "https://nightly.link/UserName/RepoName/actions/runs/987654321/SomeArtifact.zip",
     ]
+    assert_nofollow
   end
 
   test "no artifacts" do
@@ -256,6 +267,7 @@ describe "dash_by_run" do
       "No artifacts found for run #987654326",
       "https://github.com/UserName/RepoName/actions/runs/987654326#artifacts",
     ]
+    assert_nofollow
   end
 end
 
@@ -277,15 +289,21 @@ describe "by_branch" do
     resp, body = serve("/UserName/RepoName/workflows/SomeWorkflow/SomeBranch/SomeArtifact")
     assert_canonical "https://nightly.link/UserName/RepoName/workflows/SomeWorkflow/SomeBranch/SomeArtifact"
     assert_contents [
+      "Repository UserName/RepoName", "Workflow SomeWorkflow.yml | Branch SomeBranch | Artifact SomeArtifact",
+    ] * 2 + [
       "https://nightly.link/UserName/RepoName/workflows/SomeWorkflow/SomeBranch/SomeArtifact.zip",
       "https://nightly.link/UserName/RepoName/actions/runs/#{RUN_2}/SomeArtifact.zip",
       "https://nightly.link/UserName/RepoName/actions/artifacts/#{ARTIFACT_1}.zip",
+    ].flat_map { |s| [s, s] } + [
       "http://example.org/download1",
       "https://github.com/UserName/RepoName/actions?query=event%3Aschedule+is%3Asuccess+branch%3ASomeBranch",
       "https://github.com/UserName/RepoName/actions/runs/#{RUN_2}#artifacts",
       "https://github.com/UserName/RepoName/suites/#{CHECK_SUITE_1}/artifacts/#{ARTIFACT_1}",
     ]
+    assert_nofollow
+  end
 
+  test "redirect" do
     resp, body = serve("/UserName/RepoName/workflows/SomeWorkflow/SomeBranch/SomeArtifact.zip")
     assert_redirect "http://example.org/download1"
   end
@@ -297,6 +315,7 @@ describe "by_branch" do
       assert_contents [
         "Repository not found:", "https://github.com/#{PRIVATE_REPO}",
       ]
+      assert_nofollow
     end
 
     test "with wrong password" do
@@ -305,6 +324,7 @@ describe "by_branch" do
       assert_contents [
         "Repository not found:", "https://github.com/#{PRIVATE_REPO}",
       ]
+      assert_nofollow
     end
 
     test do
@@ -325,11 +345,13 @@ describe "by_branch" do
         "https://nightly.link/#{PRIVATE_REPO}/workflows/SomeWorkflow/SomeBranch/SomeArtifact.zip?h=6c9bf24563d1896f5de321ce6043413f8c75ef16",
         "https://nightly.link/#{PRIVATE_REPO}/actions/runs/#{RUN_2}/SomeArtifact.zip?h=6c9bf24563d1896f5de321ce6043413f8c75ef16",
         "https://nightly.link/#{PRIVATE_REPO}/actions/artifacts/#{ARTIFACT_1}.zip?h=6c9bf24563d1896f5de321ce6043413f8c75ef16",
+      ].flat_map { |s| [s, s] } + [
         "http://example.org/download2",
         "https://github.com/#{PRIVATE_REPO}/actions?query=event%3Aschedule+is%3Asuccess+branch%3ASomeBranch",
         "https://github.com/#{PRIVATE_REPO}/actions/runs/#{RUN_2}#artifacts",
         "https://github.com/#{PRIVATE_REPO}/suites/#{CHECK_SUITE_1}/artifacts/#{ARTIFACT_1}",
       ]
+      assert_nofollow
     end
   end
 end
@@ -346,12 +368,18 @@ describe "by_run" do
     resp, body = serve("/UserName/RepoName/actions/runs/#{RUN_2}/SomeArtifact")
     assert_canonical "https://nightly.link/UserName/RepoName/actions/runs/#{RUN_2}/SomeArtifact"
     assert_contents [
+      "Repository UserName/RepoName", "Run #987654324 | Artifact SomeArtifact",
+    ] * 2 + [
       "https://nightly.link/UserName/RepoName/actions/runs/#{RUN_2}/SomeArtifact.zip",
       "https://nightly.link/UserName/RepoName/actions/artifacts/#{ARTIFACT_1}.zip",
+    ].flat_map { |s| [s, s] } + [
       "http://example.org/download1",
       "https://github.com/UserName/RepoName/actions/runs/#{RUN_2}#artifacts",
     ]
+    assert_nofollow
+  end
 
+  test "redirect" do
     resp, body = serve("/UserName/RepoName/actions/runs/#{RUN_2}/SomeArtifact.zip")
     assert_redirect "http://example.org/download1"
   end
@@ -363,16 +391,17 @@ describe "by_artifact" do
       headers: HTTP::Headers{"location" => "http://example.org/download1"})
   end
 
-  test "page" do
+  test do
     resp, body = serve("/UserName/RepoName/actions/artifacts/#{ARTIFACT_1}")
     assert_canonical "https://nightly.link/UserName/RepoName/actions/artifacts/#{ARTIFACT_1}"
     assert_contents [
       "https://nightly.link/UserName/RepoName/actions/artifacts/#{ARTIFACT_1}.zip",
       "http://example.org/download1",
     ]
+    assert_nofollow
   end
 
-  test "zip" do
+  test "redirect" do
     resp, body = serve("/UserName/RepoName/actions/artifacts/#{ARTIFACT_1}.zip")
     assert_redirect "http://example.org/download1"
   end
@@ -392,7 +421,7 @@ describe "by_job" do
       headers: HTTP::Headers{"location" => "http://example.org/download1"})
   end
 
-  test "page" do
+  test do
     resp, body = serve("/uSerName/RepoName/runs/#{JOB_1}")
     assert_canonical "https://nightly.link/uSerName/RepoName/runs/#{JOB_1}"
     assert_contents [
@@ -402,6 +431,7 @@ describe "by_job" do
       "http://example.org/download1",
       "https://github.com/uSerName/RepoName/runs/#{JOB_1}",
     ]
+    assert_nofollow
   end
 
   test "txt" do
@@ -420,6 +450,7 @@ describe "by_job" do
         assert_contents [
           "expired", "https://github.com/UserName/RepoName/runs/#{JOB_2}",
         ]
+        assert_nofollow
       end
     end
   end

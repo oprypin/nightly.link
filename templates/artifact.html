@@ -13,7 +13,7 @@
       <% if link.ext == ext %>
         <li>
           <% if !ext && i == 0 %><b><% end %>
-          <a rel="nofollow" href="<%= HTML.escape(link.url) %>"<% if link.ext %> target="_blank"<% end %>><%= HTML.escape(link.title || link.url) %></a>
+          <a rel="nofollow" href="<%= HTML.escape(link.url) %>"<% if link.ext %> target="_blank"<% end %>><%= HTML.escape(link.title) %></a>
           <% if !ext && i == 0 %></b><% end %>
         </li>
       <% end %>
