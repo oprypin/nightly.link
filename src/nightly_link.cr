@@ -430,11 +430,6 @@ class NightlyLink
     end
   end
 
-  struct Result
-    property links = Array(ArtifactLink).new
-    property title : {String, String} = {"", ""}
-  end
-
   @[Retour::Get("/{repo_owner}/{repo_name}/workflows/{workflow}/{branch}/{artifact}{zip:\\.zip}")]
   @[Retour::Get("/{repo_owner}/{repo_name}/workflows/{workflow}/{branch}/{artifact}")]
   def by_branch(
@@ -449,18 +444,23 @@ class NightlyLink
     run = get_latest_run(repo_owner, repo_name, workflow, branch, token)
     repo_owner, repo_name = run.repository.owner, run.repository.name
 
-    result = by_run(nil, repo_owner, repo_name, run.id, artifact, run.check_suite_id, h)
-    result.title = {"Repository #{repo_owner}/#{repo_name}", "Workflow #{workflow} | Branch #{branch} | Artifact #{artifact}"}
-    result.links << ArtifactLink.new(
+    links = by_run(nil, repo_owner, repo_name, run.id, artifact, run.check_suite_id, h, zip: zip)
+    title = {"Repository #{repo_owner}/#{repo_name}", "Workflow #{workflow} | Branch #{branch} | Artifact #{artifact}"}
+    links << ArtifactLink.new(
       github_actions_link(repo_owner, repo_name, event: run.event, branch: branch),
       "Browse workflow runs on branch '#{branch}'", ext: true
     )
-    result.links << ArtifactLink.new(abs_url(NightlyLink.gen_by_branch(
-      repo_owner: repo_owner, repo_name: repo_name, workflow: workflow.rchop(".yml"), branch: branch, artifact: artifact, zip: ".zip"
-    )), result.title[1], h: h)
+    canonical = abs_url(NightlyLink.gen_by_branch(
+      repo_owner: repo_owner, repo_name: repo_name, workflow: workflow.rchop(".yml"), branch: branch, artifact: artifact
+    ))
+    links << ArtifactLink.new(canonical + ".zip", title[1], h: h)
+    canonical += "?h=#{h}" if h
 
-    return artifact_page(ctx, result, !!zip) if ctx
-    return result
+    return links if ctx.nil?
+    links.reverse!
+    ctx.response.content_type = "text/html"
+    ECR.embed("templates/head.html", ctx.response)
+    ECR.embed("templates/artifact.html", ctx.response)
   end
 
   @[Retour::Get("/{repo_owner}/{repo_name}/actions/runs/{run_id:[0-9]+}/{artifact}{zip:\\.zip}")]
@@ -491,17 +491,22 @@ class NightlyLink
     ) if !art
     repo_owner, repo_name = art.repository.owner, art.repository.name
 
-    result = by_artifact(nil, repo_owner, repo_name, art.id, check_suite_id, h)
-    result.title = {"Repository #{repo_owner}/#{repo_name}", "Run ##{run_id} | Artifact #{artifact}"}
-    result.links << ArtifactLink.new(
+    links = by_artifact(nil, repo_owner, repo_name, art.id, check_suite_id, h, zip: zip)
+    title = {"Repository #{repo_owner}/#{repo_name}", "Run ##{run_id} | Artifact #{artifact}"}
+    links << ArtifactLink.new(
       github_run_link(repo_owner, repo_name, run_id), "View run ##{run_id}", ext: true
     )
-    result.links << ArtifactLink.new(abs_url(NightlyLink.gen_by_run(
-      repo_owner: repo_owner, repo_name: repo_name, run_id: run_id, artifact: artifact, zip: ".zip"
-    )), result.title[1], h: h)
+    canonical = abs_url(NightlyLink.gen_by_run(
+      repo_owner: repo_owner, repo_name: repo_name, run_id: run_id, artifact: artifact
+    ))
+    links << ArtifactLink.new(canonical + ".zip", title[1], h: h)
+    canonical += "?h=#{h}" if h
 
-    return artifact_page(ctx, result, !!zip) if ctx
-    return result
+    return links if ctx.nil?
+    links.reverse!
+    ctx.response.content_type = "text/html"
+    ECR.embed("templates/head.html", ctx.response)
+    ECR.embed("templates/artifact.html", ctx.response)
   end
 
   @[Retour::Get("/{repo_owner}/{repo_name}/actions/artifacts/{artifact_id:[0-9]+}{zip:\\.zip}")]
@@ -537,32 +542,27 @@ class NightlyLink
       end
       raise e
     end
-    result = Result.new
-    result.title = {"Repository #{repo_owner}/#{repo_name}", "Artifact ##{artifact_id}"}
-    result.links << ArtifactLink.new(tmp_link, "Ephemeral direct download link (expires in <1 minute)")
-    result.links << ArtifactLink.new(
+    if zip
+      raise HTTPException.redirect(tmp_link)
+    end
+
+    links = [] of ArtifactLink
+    title = {"Repository #{repo_owner}/#{repo_name}", "Artifact ##{artifact_id}"}
+    links << ArtifactLink.new(tmp_link, "Ephemeral direct download link (expires in <1 minute)")
+    links << ArtifactLink.new(
       artifact_gh_link, "Direct download of artifact ##{artifact_id} (requires GitHub login)", ext: true
     ) if artifact_gh_link
-    result.links << ArtifactLink.new(abs_url(NightlyLink.gen_by_artifact(
-      repo_owner: repo_owner, repo_name: repo_name, artifact_id: artifact_id, zip: ".zip"
-    )), result.title[1], h: h)
+    canonical = abs_url(NightlyLink.gen_by_artifact(
+      repo_owner: repo_owner, repo_name: repo_name, artifact_id: artifact_id
+    ))
+    links << ArtifactLink.new(canonical + ".zip", title[1], h: h)
+    canonical += "?h=#{h}" if h
 
-    return artifact_page(ctx, result, !!zip) if ctx
-    return result
-  end
-
-  def artifact_page(ctx, result : Result, zip : Bool)
-    if zip
-      raise HTTPException.redirect(result.links.first.url)
-    else
-      title = result.title
-      links = result.links.reverse!
-      canonical = links.first.url.rchop(".zip")
-
-      ctx.response.content_type = "text/html"
-      ECR.embed("templates/head.html", ctx.response)
-      ECR.embed("templates/artifact.html", ctx.response)
-    end
+    return links if ctx.nil?
+    links.reverse!
+    ctx.response.content_type = "text/html"
+    ECR.embed("templates/head.html", ctx.response)
+    ECR.embed("templates/artifact.html", ctx.response)
   end
 
   @[Retour::Get("/{repo_owner}/{repo_name}/runs/{job_id:[0-9]+}{txt:\\.txt}")]
@@ -597,7 +597,7 @@ class NightlyLink
 
     canonical = abs_url(NightlyLink.gen_by_job(repo_owner: repo_owner, repo_name: repo_name, job_id: job_id))
     links = {
-      ArtifactLink.new(canonical + ".txt"),
+      ArtifactLink.new(canonical + ".txt", h: h),
       ArtifactLink.new(tmp_link, "Ephemeral link to logs (expires in <1 minute)"),
       ArtifactLink.new(github_job_link(repo_owner, repo_name, job_id), "View job ##{job_id}", ext: true),
     }
