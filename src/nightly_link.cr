@@ -181,6 +181,14 @@ class NightlyLink
     client_id: GITHUB_CLIENT_ID, scope: "", redirect_uri: abs_url(NightlyLink.gen_dashboard),
   })
 
+  def workflow_pattern(repo_owner : String, repo_name : String) : Regex
+    %r(^https?://github.com/(#{repo_owner})/(#{repo_name})/(blob|tree|raw|blame|commits)/([^/]+)/\.github/workflows/([^/]+\.ya?ml)(#.*)?$)
+  end
+
+  def workflow_placeholder(repo_owner = "$user", repo_name = "$repo") : String
+    "https://github.com/#{repo_owner}/#{repo_name}/blob/$branch/.github/workflows/$workflow.yml"
+  end
+
   WORKFLOW_EXAMPLES = {
     "https://github.com/oprypin/nightly.link/blob/master/.github/workflows/upload-test.yml" => {
       repo_owner: "oprypin", repo_name: "nightly.link", workflow: "upload-test", branch: "master", artifact: "some-artifact",
@@ -192,14 +200,7 @@ class NightlyLink
       repo_owner: "quassel", repo_name: "quassel", workflow: "main", branch: "master", artifact: "Windows",
     },
   }.to_a
-
-  def workflow_pattern(repo_owner : String, repo_name : String) : Regex
-    %r(^https?://github.com/(#{repo_owner})/(#{repo_name})/(blob|tree|raw|blame|commits)/([^/]+)/\.github/workflows/([^/]+\.ya?ml)(#.*)?$)
-  end
-
-  def workflow_placeholder(repo_owner = "$user", repo_name = "$repo") : String
-    "https://github.com/#{repo_owner}/#{repo_name}/blob/$branch/.github/workflows/$workflow.yml"
-  end
+  @@examples_cache = MemoryCache(String, {WorkflowRun, Artifact}).new
 
   @[Retour::Get("/")]
   def index(ctx)
@@ -209,16 +210,25 @@ class NightlyLink
     messages = [] of String
     if url
       begin
-        raise HTTPException.redirect(GitHubRoutes.call("GET", url.lchop("https://github.com"), direct: false))
+        raise HTTPException.redirect(GitHubRoutes.call("GET", url.lchop("https://github.com").partition("?")[0].partition("#")[0], direct: false))
       rescue e : Retour::NotFound
-        messages << "Did not detect a link to a GitHub workflow file." << e.to_s # TODO
+        messages << "Did not detect a link to a GitHub workflow file, actions run, or artifact." << e.to_s
       end
     end
 
     canonical = abs_url(NightlyLink.gen_index)
-    example_workflow, example_args = WORKFLOW_EXAMPLES.sample
-    example_art = example_args[:artifact]
-    example_dest = abs_url(NightlyLink.gen_by_branch(**example_args))
+    example_workflow, args = WORKFLOW_EXAMPLES.sample
+    example_art = args[:artifact]
+    example_dest = abs_url(NightlyLink.gen_by_branch(**args))
+
+    run, artifact = @@examples_cache.fetch(example_workflow) do
+      token = GitHubApp.token(FALLBACK_INSTALL_ID)
+      run_ = get_latest_run(args[:repo_owner], args[:repo_name], args[:workflow] + ".yml", args[:branch], token)
+      artifact_ = Artifacts.for_run(args[:repo_owner], args[:repo_name], run_.id, token, expires_in: 3.hours).first
+      {run_, artifact_}
+    end
+    example_run_link = GitHubRoutes.gen_run(repo_owner: args[:repo_owner], repo_name: args[:repo_name], run_id: run.id)
+    example_art_link = GitHubRoutes.gen_artifact_download(repo_owner: args[:repo_owner], repo_name: args[:repo_name], check_suite_id: run.check_suite_id, artifact_id: artifact.id)
 
     ctx.response.content_type = "text/html"
     ECR.embed("templates/head.html", ctx.response)
@@ -401,7 +411,7 @@ class NightlyLink
     run = get_latest_run(repo_owner, repo_name, workflow, branch, token)
     repo_owner, repo_name = run.repository.owner, run.repository.name
 
-    result = by_run(nil, repo_owner, repo_name, run.id, artifact, run.check_suite_url.rpartition("/").last.to_i64?, h)
+    result = by_run(nil, repo_owner, repo_name, run.id, artifact, run.check_suite_id, h)
     result.title = {"Repository #{repo_owner}/#{repo_name}", "Workflow #{workflow} | Branch #{branch} | Artifact #{artifact}"}
     result.links << ArtifactLink.new(
       github_actions_link(repo_owner, repo_name, event: run.event, branch: branch),
@@ -460,7 +470,7 @@ class NightlyLink
     h = ctx.request.query_params["h"]? if ctx
     token, h = RepoInstallation.verified_token(@db, repo_owner, repo_name, h: h)
 
-    artifact_gh_link = "https://github.com/#{repo_owner}/#{repo_name}/suites/#{check_suite_id}/artifacts/#{artifact_id}" if check_suite_id
+    artifact_gh_link = "https://github.com" + GitHubRoutes.gen_artifact_download(repo_owner: repo_owner, repo_name: repo_name, check_suite_id: check_suite_id, artifact_id: artifact_id) if check_suite_id
     gh_link = artifact_gh_link || "https://api.github.com/repos/#{repo_owner}/#{repo_name}/actions/artifacts/#{artifact_id}"
     tmp_link = begin
       Artifact.zip_by_id(repo_owner, repo_name, artifact_id, token: token)

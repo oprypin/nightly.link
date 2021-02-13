@@ -251,6 +251,10 @@ struct WorkflowRun
   @[JSON::Field(converter: RFC3339Converter)]
   property updated_at : Time
   property repository : Repository
+
+  def check_suite_id
+    check_suite_url.rpartition("/").last.to_i64?
+  end
 end
 
 struct Artifacts

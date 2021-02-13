@@ -11,3 +11,18 @@ body {
         padding: 15px;
     }
 }
+
+details {
+    background-color: #f9f9f9;
+    border-left: 2px solid #ccc;
+    padding: 5px;
+}
+details summary {
+    font-size: 1.25em;
+    margin: 3px;
+}
+a.example {
+    text-decoration: underline;
+    text-decoration-style: dashed;
+    text-decoration-thickness: 0.5px;
+}

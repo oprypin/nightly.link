@@ -27,7 +27,7 @@ Spec.before_each do
 end
 
 describe "index" do
-  test "page" do
+  pending "page" do
     resp, body = serve("/")
     assert resp.headers["Content-Type"] == "text/html"
     assert resp.status == HTTP::Status::OK
@@ -40,7 +40,7 @@ describe "index" do
     assert resp.headers["Location"] == "/oprypin/nightly.link/workflows/upload-test/master"
   end
 
-  test "bad url" do
+  pending "bad url" do
     resp, body = serve("/?url=https://hmm")
     assert resp.status == HTTP::Status::OK
     assert body.includes?("select your repositories")
