@@ -13,6 +13,7 @@ RUN_1          =   987654321
 RUN_2          =   987654324
 RUN_3          =   987654326
 JOB_1          =  9977553311
+JOB_2          =  9977553317
 ARTIFACT_1     =    87654321
 PRIVATE_REPO   = "oprypin/test-private-repo"
 
@@ -72,19 +73,21 @@ describe "index" do
 
   describe "redirect" do
     {query: "/?url=https://github.com", bare: ""}.each do |kind, prefix|
-      test "workflow / #{kind}" do
-        resp, body = serve("#{prefix}/oprypin/nightly.link/blob/master/.github/workflows/upload-test.yml")
-        assert_redirect "/oprypin/nightly.link/workflows/upload-test/master"
-      end
+      describe kind do
+        test "workflow" do
+          resp, body = serve("#{prefix}/oprypin/nightly.link/blob/master/.github/workflows/upload-test.yml")
+          assert_redirect "/oprypin/nightly.link/workflows/upload-test/master"
+        end
 
-      test "artifact_download / #{kind}" do
-        resp, body = serve("#{prefix}/oprypin/nightly.link/suites/1987122430/artifacts/39579703")
-        assert_redirect "/oprypin/nightly.link/actions/artifacts/39579703#{".zip" if kind == :bare}"
-      end
+        test "artifact_download" do
+          resp, body = serve("#{prefix}/oprypin/nightly.link/suites/1987122430/artifacts/39579703")
+          assert_redirect "/oprypin/nightly.link/actions/artifacts/39579703#{".zip" if kind == :bare}"
+        end
 
-      test "logs_download / #{kind}" do
-        resp, body = serve("#{prefix}/oprypin/nightly.link/commit/30c72d4e1100a04a9ee657083de0bd2b8f706eb7/checks/1849327325/logs")
-        assert_redirect "/oprypin/nightly.link/runs/1849327325#{".txt" if kind == :bare}"
+        test "logs_download" do
+          resp, body = serve("#{prefix}/oprypin/nightly.link/commit/30c72d4e1100a04a9ee657083de0bd2b8f706eb7/checks/1849327325/logs")
+          assert_redirect "/oprypin/nightly.link/runs/1849327325#{".txt" if kind == :bare}"
+        end
       end
     end
 
@@ -102,8 +105,7 @@ describe "index" do
       resp, body = serve("/?url=https://hmm")
       assert resp.status == HTTP::Status::OK
       assert_contents [
-        "select your repositories",
-        "not detect a link",
+        "select your repositories", "not detect a link",
       ]
     end
   end
@@ -181,7 +183,7 @@ describe "dash_by_branch" do
       ]
     end
 
-    it do
+    test do
       WebMock.stub(:get, "https://api.github.com/repos/#{PRIVATE_REPO}/actions/workflows/SomeWorkflow.yml/runs?per_page=1&branch=SomeBranch&event=push&status=success").to_return(
         body: %({"workflow_runs":[
                 {"id":#{RUN_1},"event":"push","workflow_id":#{WORKFLOW_1},"check_suite_url":"https://api.github.com/repos/#{PRIVATE_REPO}/check-suites/#{CHECK_SUITE_1}","updated_at":"2020-12-19T22:22:22Z","repository":{"full_name":"#{PRIVATE_REPO}","private":false,"fork":false}}]}))
@@ -197,7 +199,6 @@ describe "dash_by_branch" do
         "Repository #{PRIVATE_REPO}", "Workflow SomeWorkflow.yml | Branch SomeBranch",
         "Repository #{PRIVATE_REPO}", "Workflow SomeWorkflow.yml | Branch SomeBranch",
         "https://nightly.link/#{PRIVATE_REPO}/workflows/SomeWorkflow/SomeBranch/SomeArtifact?h=6c9bf24563d1896f5de321ce6043413f8c75ef16",
-        "https://nightly.link/#{PRIVATE_REPO}/workflows/SomeWorkflow/SomeBranch/SomeArtifact.zip?h=6c9bf24563d1896f5de321ce6043413f8c75ef16",
         "https://nightly.link/#{PRIVATE_REPO}/workflows/SomeWorkflow/SomeBranch/SomeArtifact.zip?h=6c9bf24563d1896f5de321ce6043413f8c75ef16",
       ]
     end
@@ -222,7 +223,6 @@ describe "dash_by_branch" do
       "Repository UserName/RepoName", "Workflow SomeWorkflow.yaml | Branch SomeBranch",
       "Repository UserName/RepoName", "Workflow SomeWorkflow.yaml | Branch SomeBranch",
       "https://nightly.link/UserName/RepoName/workflows/SomeWorkflow.yaml/SomeBranch/SomeArtifact",
-      "https://nightly.link/UserName/RepoName/workflows/SomeWorkflow.yaml/SomeBranch/SomeArtifact.zip",
       "https://nightly.link/UserName/RepoName/workflows/SomeWorkflow.yaml/SomeBranch/SomeArtifact.zip",
     ]
   end
@@ -289,6 +289,49 @@ describe "by_branch" do
     resp, body = serve("/UserName/RepoName/workflows/SomeWorkflow/SomeBranch/SomeArtifact.zip")
     assert_redirect "http://example.org/download1"
   end
+
+  describe "private" do
+    test "without password" do
+      resp, body = serve("/#{PRIVATE_REPO}/workflows/SomeWorkflow/SomeBranch/SomeArtifact.zip")
+      assert resp.status == HTTP::Status::NOT_FOUND
+      assert_contents [
+        "Repository not found:", "https://github.com/#{PRIVATE_REPO}",
+      ]
+    end
+
+    test "with wrong password" do
+      resp, body = serve("/#{PRIVATE_REPO}/workflows/SomeWorkflow/SomeBranch/SomeArtifact.zip?h=4007f0bdefca32af97b5abbe49644bd3155fe6aa")
+      assert resp.status == HTTP::Status::NOT_FOUND
+      assert_contents [
+        "Repository not found:", "https://github.com/#{PRIVATE_REPO}",
+      ]
+    end
+
+    test do
+      WebMock.stub(:get, "https://api.github.com/repos/#{PRIVATE_REPO}/actions/workflows/SomeWorkflow.yml/runs?per_page=1&branch=SomeBranch&event=push&status=success").to_return(
+        body: %({"workflow_runs":[
+                {"id":#{RUN_1},"event":"push","workflow_id":#{WORKFLOW_1},"check_suite_url":"https://api.github.com/repos/#{PRIVATE_REPO}/check-suites/#{CHECK_SUITE_1}","updated_at":"2020-12-19T22:22:22Z","repository":{"full_name":"#{PRIVATE_REPO}","private":false,"fork":false}}]}))
+      WebMock.stub(:get, "https://api.github.com/repos/#{PRIVATE_REPO}/actions/workflows/SomeWorkflow.yml/runs?per_page=1&branch=SomeBranch&event=schedule&status=success").to_return(
+        body: %({"workflow_runs":[
+                {"id":#{RUN_2},"event":"schedule","workflow_id":#{WORKFLOW_1},"check_suite_url":"https://api.github.com/repos/#{PRIVATE_REPO}/check-suites/#{CHECK_SUITE_1}","updated_at":"2021-02-07T07:15:00Z","repository":{"full_name":"#{PRIVATE_REPO}","private":false,"fork":false}}]}))
+      WebMock.stub(:get, "https://api.github.com/repos/#{PRIVATE_REPO}/actions/runs/#{RUN_2}/artifacts?per_page=100").to_return(
+        body: %({"artifacts":[{"id":#{ARTIFACT_1},"name":"SomeArtifact","url":"https://api.github.com/repos/#{PRIVATE_REPO}/actions/artifacts/#{ARTIFACT_1}"}]}))
+      WebMock.stub(:get, "https://api.github.com/repos/#{PRIVATE_REPO}/actions/artifacts/#{ARTIFACT_1}/zip").to_return(
+        headers: HTTP::Headers{"location" => "http://example.org/download2"})
+
+      resp, body = serve("/#{PRIVATE_REPO}/workflows/SomeWorkflow/SomeBranch/SomeArtifact?h=6c9bf24563d1896f5de321ce6043413f8c75ef16")
+      assert_canonical "https://nightly.link/#{PRIVATE_REPO}/workflows/SomeWorkflow/SomeBranch/SomeArtifact?h=6c9bf24563d1896f5de321ce6043413f8c75ef16"
+      assert_contents [
+        "https://nightly.link/#{PRIVATE_REPO}/workflows/SomeWorkflow/SomeBranch/SomeArtifact.zip?h=6c9bf24563d1896f5de321ce6043413f8c75ef16",
+        "https://nightly.link/#{PRIVATE_REPO}/actions/runs/#{RUN_2}/SomeArtifact.zip?h=6c9bf24563d1896f5de321ce6043413f8c75ef16",
+        "https://nightly.link/#{PRIVATE_REPO}/actions/artifacts/#{ARTIFACT_1}.zip?h=6c9bf24563d1896f5de321ce6043413f8c75ef16",
+        "http://example.org/download2",
+        "https://github.com/#{PRIVATE_REPO}/actions?query=event%3Aschedule+is%3Asuccess+branch%3ASomeBranch",
+        "https://github.com/#{PRIVATE_REPO}/actions/runs/#{RUN_2}#artifacts",
+        "https://github.com/#{PRIVATE_REPO}/suites/#{CHECK_SUITE_1}/artifacts/#{ARTIFACT_1}",
+      ]
+    end
+  end
 end
 
 describe "by_run" do
@@ -345,7 +388,7 @@ end
 
 describe "by_job" do
   before_each do
-    WebMock.stub(:get, "https://api.github.com/repos/username/reponame/actions/jobs/9977553311/logs").to_return(
+    WebMock.stub(:get, "https://api.github.com/repos/username/reponame/actions/jobs/#{JOB_1}/logs").to_return(
       headers: HTTP::Headers{"location" => "http://example.org/download1"})
   end
 
@@ -353,6 +396,8 @@ describe "by_job" do
     resp, body = serve("/uSerName/RepoName/runs/#{JOB_1}")
     assert_canonical "https://nightly.link/uSerName/RepoName/runs/#{JOB_1}"
     assert_contents [
+      "Repository uSerName/RepoName", "Job #9977553311",
+      "Repository uSerName/RepoName", "Job #9977553311",
       "https://nightly.link/uSerName/RepoName/runs/#{JOB_1}.txt",
       "http://example.org/download1",
       "https://github.com/uSerName/RepoName/runs/#{JOB_1}",
@@ -362,6 +407,21 @@ describe "by_job" do
   test "txt" do
     resp, body = serve("/UserName/RepoName/runs/#{JOB_1}.txt")
     assert_redirect "http://example.org/download1"
+  end
+
+  describe "expired" do
+    {"", ".txt"}.each do |kind|
+      test kind do
+        WebMock.stub(:get, "https://api.github.com/repos/username/reponame/actions/jobs/#{JOB_2}/logs").to_return(
+          status: 410)
+
+        resp, body = serve("/UserName/RepoName/runs/#{JOB_2}#{kind}")
+        assert resp.status == HTTP::Status::NOT_FOUND
+        assert_contents [
+          "expired", "https://github.com/UserName/RepoName/runs/#{JOB_2}",
+        ]
+      end
+    end
   end
 end
 
