@@ -669,9 +669,21 @@ class HTTPException < Exception
   end
 end
 
+class ForwarderHandler
+  include HTTP::Handler
+
+  def call(context)
+    if (ip = context.request.headers["X-Real-IP"]?)
+      context.request.remote_address = Socket::IPAddress.new(ip, 0)
+    end
+    call_next(context)
+  end
+end
+
 if (port = PORT)
   app = NightlyLink.new
   server = HTTP::Server.new([
+    ForwarderHandler.new,
     HTTP::LogHandler.new,
   ]) do |ctx|
     app.serve_request(ctx)
