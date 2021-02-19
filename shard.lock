@@ -18,7 +18,7 @@ shards:
 
   halite:
     git: https://github.com/icyleaf/halite.git
-    version: 0.10.8
+    version: 0.11.0
 
   jwt:
     git: https://github.com/crystal-community/jwt.git
@@ -38,7 +38,7 @@ shards:
 
   retour:
     git: https://github.com/oprypin/retour.git
-    version: 0.1.0+git.commit.0665577f99f48dfcf13e146f2fc53455ea64c1dd
+    version: 0.1.0+git.commit.dc75db45385ce77bea71aa2ef6081d12495500bf
 
   spec_assert:
     git: https://github.com/oprypin/spec-assert.git

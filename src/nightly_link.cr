@@ -148,11 +148,6 @@ module GitHubRoutes
 
   @[Retour::Get("/{repo_owner}/{repo_name}/{_kind:blob|tree|raw|blame|commits}/{branch}/.github/workflows/{workflow:[^/]+\\.ya?ml}")]
   def workflow_file(repo_owner, repo_name, _kind, branch, workflow, direct : Bool)
-    if branch =~ /^[0-9a-fA-F]{32,}$/
-      raise Retour::NotFound.new(
-        "Make sure you're on a branch (such as 'master'), not a commit (which '#{branch}' seems to be)."
-      )
-    end
     NightlyLink.gen_dash_by_branch(repo_owner: repo_owner, repo_name: repo_name, workflow: workflow.rchop(".yml"), branch: branch)
   end
 
@@ -217,12 +212,12 @@ class NightlyLink
 
     messages = [] of String
     if url
-      begin
-        gh_path = url.lchop("https://github.com").partition("?")[0].partition("#")[0]
-        new_path = GitHubRoutes.call("GET", gh_path, direct: false)
+      gh_path = url.lchop("https://github.com").partition("?")[0].partition("#")[0]
+      case (new_path = GitHubRoutes.call("GET", gh_path, direct: false))
+      when Retour::NotFound
+        messages << "Did not detect a link to a GitHub workflow file, actions run, or artifact." << gh_path
+      else
         raise HTTPException.redirect(new_path)
-      rescue e : Retour::NotFound
-        messages << "Did not detect a link to a GitHub workflow file, actions run, or artifact." << e.to_s
       end
     end
 
@@ -632,15 +627,16 @@ class NightlyLink
   {% end %}
 
   def serve_request(ctx, reraise = false)
-    call(ctx, ctx)
-  rescue exception
-    if exception.is_a?(Retour::NotFound)
-      if (new_path = GitHubRoutes.call(ctx, direct: true) rescue nil)
-        exception = HTTPException.redirect(new_path)
+    if call(ctx, ctx).is_a?(Retour::NotFound)
+      case (new_path = GitHubRoutes.call(ctx, direct: true))
+      when Retour::NotFound
+        raise HTTPException.new(:NotFound, ctx.request.path)
       else
-        exception = HTTPException.new(:NotFound, exception.to_s)
+        raise HTTPException.redirect(new_path)
       end
-    elsif !exception.is_a?(HTTPException)
+    end
+  rescue exception
+    if !exception.is_a?(HTTPException)
       raise exception if reraise
       Log.error(exception: exception) { }
       exception = HTTPException.new(:InternalServerError)
