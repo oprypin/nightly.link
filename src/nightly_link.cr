@@ -311,7 +311,8 @@ class NightlyLink
     artifacts = begin
       Artifacts.for_run(repo_owner, repo_name, run.id, token, expires_in: 3.hours)
     rescue e : Halite::Exception::ClientError
-      raise e unless e.status_code.in?(401, 404)
+      if_not_found(e) do
+      end
     end
     if !artifacts || artifacts.empty?
       gh_link = github_run_link(repo_owner, repo_name, run.id)
@@ -353,11 +354,10 @@ class NightlyLink
     artifacts = begin
       Artifacts.for_run(repo_owner, repo_name, run_id, token, expires_in: 3.hours)
     rescue e : Halite::Exception::ClientError
-      if e.status_code.in?(401, 404)
+      if_not_found(e) do
         raise HTTPException.new(:NotFound,
           "Repository '#{repo_owner}/#{repo_name}' or run ##{run_id} not found.\nCheck on GitHub: <#{gh_link}>")
       end
-      raise e
     end
     if artifacts.empty?
       raise HTTPException.new(:NotFound,
@@ -393,14 +393,13 @@ class NightlyLink
             token: token, max_items: 1, expires_in: expires_in
           )
         rescue e : Halite::Exception::ClientError
-          if e.status_code.in?(401, 404)
+          if_not_found(e) do
             gh_link = "https://github.com/#{repo_owner}/#{repo_name}/tree/#{branch}/.github/workflows"
             raise HTTPException.new(:NotFound,
               "Repository '#{repo_owner}/#{repo_name}' or workflow '#{workflow}' not found.\n" +
               "Check on GitHub: <#{gh_link}>"
             )
           end
-          raise e
         end
       end
     end
@@ -477,12 +476,11 @@ class NightlyLink
     artifacts = begin
       Artifacts.for_run(repo_owner, repo_name, run_id, token, expires_in: 3.hours)
     rescue e : Halite::Exception::ClientError
-      if e.status_code.in?(401, 404)
+      if_not_found(e) do
         raise HTTPException.new(:NotFound,
           "No artifacts found for run ##{run_id}.\nCheck on GitHub: <#{gh_link}>"
         )
       end
-      raise e
     end
     art = artifacts.find { |a| a.name == artifact } || artifacts.find { |a| a.name == "#{artifact}.zip" }
     raise HTTPException.new(:NotFound,
@@ -534,12 +532,11 @@ class NightlyLink
         "Check on GitHub: <#{gh_link}>"
       )
     rescue e : Halite::Exception::ClientError
-      if e.status_code.in?(401, 404)
+      if_not_found(e) do
         raise HTTPException.new(:NotFound,
           "Artifact ##{artifact_id} not found.\nCheck on GitHub: <#{gh_link}>"
         )
       end
-      raise e
     end
     if zip
       raise HTTPException.redirect(tmp_link)
@@ -583,12 +580,11 @@ class NightlyLink
         "Check on GitHub: <#{gh_link}>"
       )
     rescue e : Halite::Exception::ClientError
-      if e.status_code.in?(401, 404)
+      if_not_found(e) do
         raise HTTPException.new(:NotFound,
           "Job ##{job_id} not found.\nCheck on GitHub: <#{gh_link}>"
         )
       end
-      raise e
     end
     if txt
       raise HTTPException.redirect(tmp_link)
@@ -662,6 +658,14 @@ class HTTPException < Exception
   def self.redirect(location : String, status : HTTP::Status = :Found, headers : HTTP::Headers = HTTP::Headers.new)
     headers["Location"] = location
     HTTPException.new(status, headers: headers)
+  end
+end
+
+def if_not_found(e : Halite::Exception::ClientError)
+  if e.status_code.in?(401, 404, 451)
+    yield
+  else
+    raise e
   end
 end
 
