@@ -136,9 +136,12 @@ private def github_run_link(repo_owner : String, repo_name : String, run_id : In
   "https://github.com" + GitHubRoutes.gen_run(repo_owner: repo_owner, repo_name: repo_name, run_id: run_id) + "#artifacts"
 end
 
-private def github_actions_link(repo_owner : String, repo_name : String, *, event : String, branch : String) : String
+private def github_actions_link(
+  repo_owner : String, repo_name : String, *,
+  event : String, branch : String, status : String
+) : String
   "https://github.com/#{repo_owner}/#{repo_name}/actions?" + HTTP::Params.encode({
-    query: "event:#{event} is:success branch:#{branch}",
+    query: "event:#{event} is:#{status} branch:#{branch}",
   })
 end
 
@@ -228,7 +231,10 @@ class NightlyLink
 
     run, artifact = @@examples_cache.fetch(example_workflow) do
       token = GitHubApp.token(FALLBACK_INSTALL_ID)
-      run_ = get_latest_run(args[:repo_owner], args[:repo_name], args[:workflow] + ".yml", args[:branch], token)
+      run_ = get_latest_run(
+        args[:repo_owner], args[:repo_name],
+        workflow: args[:workflow] + ".yml", branch: args[:branch], status: "success", token: token
+      )
       artifact_ = Artifacts.for_run(args[:repo_owner], args[:repo_name], run_.id, token, expires_in: 3.hours).first
       {run_, artifact_}
     end
@@ -301,8 +307,12 @@ class NightlyLink
     unless workflow.to_i64?(whitespace: false) || workflow.ends_with?(".yml") || workflow.ends_with?(".yaml")
       workflow += ".yml"
     end
+    status = ctx.request.query_params.fetch("status", "success")
+    if !status.in?("success", "completed")
+      raise HTTPException.new(:BadRequest, "?status must be 'success' (default) or 'completed'")
+    end
 
-    run = get_latest_run(repo_owner, repo_name, workflow, branch, token)
+    run = get_latest_run(repo_owner, repo_name, workflow: workflow, branch: branch, status: status, token: token)
     repo_owner, repo_name = run.repository.owner, run.repository.name
     if run.updated_at < 90.days.ago
       message = "Warning: the latest successful run is older than 90 days, and its artifacts likely expired."
@@ -384,12 +394,15 @@ class NightlyLink
     ECR.embed("templates/artifact_list.html", ctx.response)
   end
 
-  private def get_latest_run(repo_owner : String, repo_name : String, workflow : String, branch : String, token : InstallationToken)
+  private def get_latest_run(
+    repo_owner : String, repo_name : String,
+    workflow : String, branch : String, status : String, token : InstallationToken
+  )
     futures = [{"push", 5.minutes}, {"schedule", 1.hour}].map do |(event, expires_in)|
       future do
         begin
           WorkflowRuns.for_workflow(
-            repo_owner, repo_name, workflow, branch: branch, event: event,
+            repo_owner, repo_name, workflow, branch: branch, event: event, status: status,
             token: token, max_items: 1, expires_in: expires_in
           )
         rescue e : Halite::Exception::ClientError
@@ -405,7 +418,7 @@ class NightlyLink
     end
     runs = futures.map(&.get.first?).compact
     if runs.empty?
-      gh_link = github_actions_link(repo_owner, repo_name, event: "push", branch: branch)
+      gh_link = github_actions_link(repo_owner, repo_name, event: "push", branch: branch, status: status)
       raise HTTPException.new(:NotFound,
         "No successful runs found for workflow '#{workflow}' and branch '#{branch}'.\n" +
         "Check on GitHub: <#{gh_link}>"
@@ -439,13 +452,18 @@ class NightlyLink
     unless workflow.to_i64?(whitespace: false) || workflow.ends_with?(".yml") || workflow.ends_with?(".yaml")
       workflow += ".yml"
     end
-    run = get_latest_run(repo_owner, repo_name, workflow, branch, token)
+    status = ctx.request.query_params.fetch("status", "success")
+    if !status.in?("success", "completed")
+      raise HTTPException.new(:BadRequest, "?status must be 'success' (default) or 'completed'")
+    end
+
+    run = get_latest_run(repo_owner, repo_name, workflow: workflow, branch: branch, status: status, token: token)
     repo_owner, repo_name = run.repository.owner, run.repository.name
 
     links = by_run(nil, repo_owner, repo_name, run.id, artifact, run.check_suite_id, h, zip: zip)
     title = {"Repository #{repo_owner}/#{repo_name}", "Workflow #{workflow} | Branch #{branch} | Artifact #{artifact}"}
     links << ArtifactLink.new(
-      github_actions_link(repo_owner, repo_name, event: run.event, branch: branch),
+      github_actions_link(repo_owner, repo_name, event: run.event, branch: branch, status: status),
       "Browse workflow runs on branch '#{branch}'", ext: true
     )
     canonical = abs_url(NightlyLink.gen_by_branch(

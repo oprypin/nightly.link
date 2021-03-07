@@ -175,6 +175,11 @@ describe "dash_by_branch" do
     assert_nofollow
   end
 
+  test "bad request" do
+    resp, body = serve("/UserName/RepoName/workflows/SomeWorkflow/SomeBranch?status=foo")
+    assert resp.status == HTTP::Status::BAD_REQUEST
+  end
+
   describe "private" do
     test "without password" do
       resp, body = serve("/#{PRIVATE_REPO}/workflows/SomeWorkflow/SomeBranch")
@@ -308,6 +313,18 @@ describe "by_branch" do
       "https://github.com/UserName/RepoName/suites/#{CHECK_SUITE_1}/artifacts/#{ARTIFACT_1}",
     ]
     assert_nofollow
+  end
+
+  test "completed" do
+    WebMock.stub(:get, "https://api.github.com/repos/username/reponame/actions/workflows/SomeWorkflow.yml/runs?per_page=1&branch=SomeBranch&event=push&status=completed").to_return(
+      body: %({"workflow_runs":[
+                {"id":#{RUN_1},"event":"push","workflow_id":#{WORKFLOW_1},"check_suite_url":"https://api.github.com/repos/UserName/RepoName/check-suites/#{CHECK_SUITE_1}","updated_at":"2020-12-19T22:22:22Z","repository":{"full_name":"UserName/RepoName","private":false,"fork":false}}]}))
+    WebMock.stub(:get, "https://api.github.com/repos/username/reponame/actions/workflows/SomeWorkflow.yml/runs?per_page=1&branch=SomeBranch&event=schedule&status=completed").to_return(
+      body: %({"workflow_runs":[
+                {"id":#{RUN_2},"event":"schedule","workflow_id":#{WORKFLOW_1},"check_suite_url":"https://api.github.com/repos/UserName/RepoName/check-suites/#{CHECK_SUITE_1}","updated_at":"2021-02-07T07:15:00Z","repository":{"full_name":"UserName/RepoName","private":false,"fork":false}}]}))
+
+    resp, body = serve("/UserName/RepoName/workflows/SomeWorkflow/SomeBranch/SomeArtifact?status=completed")
+    assert_canonical "https://nightly.link/UserName/RepoName/workflows/SomeWorkflow/SomeBranch/SomeArtifact"
   end
 
   test "redirect" do
