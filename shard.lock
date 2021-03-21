@@ -26,7 +26,7 @@ shards:
 
   markd:
     git: https://github.com/icyleaf/markd.git
-    version: 0.2.1
+    version: 0.3.0
 
   memory_cache:
     git: https://github.com/kostya/memory_cache.git
@@ -34,7 +34,7 @@ shards:
 
   openssl_ext:
     git: https://github.com/spider-gazelle/openssl_ext.git
-    version: 2.1.0
+    version: 2.1.2
 
   retour:
     git: https://github.com/oprypin/retour.git
@@ -55,3 +55,4 @@ shards:
   webmock:
     git: https://github.com/manastech/webmock.cr.git
     version: 0.14.0
+
