@@ -10,6 +10,8 @@ jobs:
     steps:
       - uses: actions/github-script@v3
         with:
+          # This snippet is public-domain, taken from
+          # https://github.com/oprypin/nightly.link/blob/master/.github/workflows/pr-comment.yml
           script: |
             const {owner, repo} = context.repo;
             const run_id = ${{github.event.workflow_run.id}};

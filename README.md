@@ -2,12 +2,14 @@
 <a href="https://github.com/oprypin/nightly.link"><img src="https://img.shields.io/github/stars/oprypin/nightly.link?style=social" alt="" style="float: right; height: 30px; margin-top: 10px"></a>
 </h1>
 
-This service lets you get a shareable link to download a build artifact from the latest successful GitHub Actions build of a repository.
+This service lets you get a shareable link to download a [build artifact][] from the latest successful [GitHub Actions][] build of a repository.
 
 Any public repository is accessible by default and **visitors don't need to log in**.
 
 If you'll be publishing a link to your own repository's artifacts, please install [the GitHub App][app] anyway, so that downloads for your repositories don't share the global API rate limit. The throttling will likely become very bad over time.
 
+[GitHub Actions]: https://docs.github.com/en/actions/guides/about-continuous-integration#about-continuous-integration-using-github-actions
+[build artifact]: https://docs.github.com/en/actions/guides/storing-workflow-data-as-artifacts#uploading-build-and-test-artifacts
 [app]: https://github.com/apps/nightly-link
 
 <include controls>
