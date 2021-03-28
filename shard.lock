@@ -2,7 +2,7 @@ version: 2.0
 shards:
   bindata:
     git: https://github.com/spider-gazelle/bindata.git
-    version: 1.8.1
+    version: 1.8.3
 
   cron_parser:
     git: https://github.com/kostya/cron_parser.git
@@ -10,7 +10,7 @@ shards:
 
   db:
     git: https://github.com/crystal-lang/crystal-db.git
-    version: 0.10.0
+    version: 0.10.1
 
   future:
     git: https://github.com/crystal-community/future.cr.git
@@ -18,15 +18,15 @@ shards:
 
   halite:
     git: https://github.com/icyleaf/halite.git
-    version: 0.11.0
+    version: 0.12.0
 
   jwt:
     git: https://github.com/crystal-community/jwt.git
-    version: 1.5.0
+    version: 1.5.1
 
   markd:
     git: https://github.com/icyleaf/markd.git
-    version: 0.3.0
+    version: 0.4.0
 
   memory_cache:
     git: https://github.com/kostya/memory_cache.git
@@ -34,7 +34,7 @@ shards:
 
   openssl_ext:
     git: https://github.com/spider-gazelle/openssl_ext.git
-    version: 2.1.2
+    version: 2.1.4
 
   retour:
     git: https://github.com/oprypin/retour.git
@@ -50,7 +50,7 @@ shards:
 
   tasker:
     git: https://github.com/spider-gazelle/tasker.git
-    version: 2.0.2
+    version: 2.0.3
 
   webmock:
     git: https://github.com/manastech/webmock.cr.git
