@@ -21,7 +21,7 @@ jobs:
           path: lib
           key: ${{ runner.os }}-shards-${{ hashFiles('**/shard.lock') }}
       - name: Install dependencies
-        run: shards check || shards install
+        run: shards check || shards install --ignore-crystal-version
       - name: Build
         run: make -j
       - name: Run tests
