@@ -62,7 +62,7 @@ describe "index" do
       body: %({"workflow_runs":[
                 {"id":#{RUN_1},"event":"push","workflow_id":#{WORKFLOW_1},"check_suite_url":"https://api.github.com/repos/UserName/RepoName/check-suites/#{CHECK_SUITE_1}","updated_at":"2020-12-19T22:22:22Z","repository":{"full_name":"UserName/RepoName","private":false,"fork":false}}]}))
     WebMock.stub(:get, %r(https://api.github.com/repos/.+/runs/.+/artifacts\?)).to_return(
-      body: %({"artifacts":[{"id":#{ARTIFACT_1},"name":"SomeArtifact","url":"https://api.github.com/repos/UserName/RepoName/actions/artifacts/#{ARTIFACT_1}"}]}))
+      body: %({"artifacts":[{"id":#{ARTIFACT_1},"name":"Some#Artifact","url":"https://api.github.com/repos/UserName/RepoName/actions/artifacts/#{ARTIFACT_1}"}]}))
   end
 
   test do
@@ -97,12 +97,12 @@ describe "index" do
     end
 
     test "run" do
-      resp, body = serve("/?url=" + HTML.escape("https://github.com/oprypin/nightly.link/actions/runs/545511762"))
+      resp, body = serve("/?url=" + URI.encode_www_form("https://github.com/oprypin/nightly.link/actions/runs/545511762"))
       assert_redirect "/oprypin/nightly.link/actions/runs/545511762"
     end
 
     test "job" do
-      resp, body = serve("/?url=" + HTML.escape("https://github.com/oprypin/nightly.link/runs/1849327325?check_suite_focus=true"))
+      resp, body = serve("/?url=" + URI.encode_www_form("https://github.com/oprypin/nightly.link/runs/1849327325?check_suite_focus=true"))
       assert_redirect "/oprypin/nightly.link/runs/1849327325"
     end
 
@@ -158,7 +158,7 @@ describe "dash_by_branch" do
                 {"id":#{RUN_2},"event":"schedule","workflow_id":#{WORKFLOW_1},"check_suite_url":"https://api.github.com/repos/UserName/RepoName/check-suites/#{CHECK_SUITE_1}","updated_at":"2021-02-07T07:15:00Z","repository":{"full_name":"UserName/RepoName","private":false,"fork":false}}]}))
     WebMock.stub(:get, "https://api.github.com/repos/username/reponame/actions/runs/#{RUN_2}/artifacts?per_page=100").to_return(
       body: %({"artifacts":[
-                {"id":#{ARTIFACT_1},"name":"SomeArtifact","url":"https://api.github.com/repos/UserName/RepoName/actions/artifacts/#{ARTIFACT_1}"},
+                {"id":#{ARTIFACT_1},"name":"Some#Artifact","url":"https://api.github.com/repos/UserName/RepoName/actions/artifacts/#{ARTIFACT_1}"},
                 {"id":#{ARTIFACT_2},"name":"AnotherArtifact","url":"https://api.github.com/repos/UserName/RepoName/actions/artifacts/#{ARTIFACT_2}"}]}))
   end
 
@@ -168,9 +168,9 @@ describe "dash_by_branch" do
     assert_contents [
       "Repository UserName/RepoName", "Workflow SomeWorkflow.yml | Branch SomeBranch",
       "Repository UserName/RepoName", "Workflow SomeWorkflow.yml | Branch SomeBranch",
-      "https://nightly.link/UserName/RepoName/workflows/SomeWorkflow/SomeBranch/SomeArtifact",
-      "https://nightly.link/UserName/RepoName/workflows/SomeWorkflow/SomeBranch/SomeArtifact.zip",
-      "https://nightly.link/UserName/RepoName/workflows/SomeWorkflow/SomeBranch/SomeArtifact.zip",
+      "https://nightly.link/UserName/RepoName/workflows/SomeWorkflow/SomeBranch/Some%23Artifact",
+      "https://nightly.link/UserName/RepoName/workflows/SomeWorkflow/SomeBranch/Some%23Artifact.zip",
+      "https://nightly.link/UserName/RepoName/workflows/SomeWorkflow/SomeBranch/Some%23Artifact.zip",
     ]
     assert_nofollow
   end
@@ -208,7 +208,7 @@ describe "dash_by_branch" do
                   {"id":#{RUN_2},"event":"schedule","workflow_id":#{WORKFLOW_1},"check_suite_url":"https://api.github.com/repos/#{PRIVATE_REPO}/check-suites/#{CHECK_SUITE_1}","updated_at":"2021-02-07T07:15:00Z","repository":{"full_name":"#{PRIVATE_REPO}","private":false,"fork":false}}]}))
       WebMock.stub(:get, "https://api.github.com/repos/#{PRIVATE_REPO}/actions/runs/#{RUN_2}/artifacts?per_page=100").to_return(
         body: %({"artifacts":[
-                  {"id":#{ARTIFACT_1},"name":"SomeArtifact","url":"https://api.github.com/repos/#{PRIVATE_REPO}/actions/artifacts/#{ARTIFACT_1}"},
+                  {"id":#{ARTIFACT_1},"name":"Some#Artifact","url":"https://api.github.com/repos/#{PRIVATE_REPO}/actions/artifacts/#{ARTIFACT_1}"},
                   {"id":#{ARTIFACT_2},"name":"AnotherArtifact","url":"https://api.github.com/repos/#{PRIVATE_REPO}/actions/artifacts/#{ARTIFACT_2}"}]}))
 
       resp, body = serve("/#{PRIVATE_REPO}/workflows/SomeWorkflow/SomeBranch?h=6c9bf24563d1896f5de321ce6043413f8c75ef16")
@@ -216,8 +216,8 @@ describe "dash_by_branch" do
       assert_contents [
         "Repository #{PRIVATE_REPO}", "Workflow SomeWorkflow.yml | Branch SomeBranch",
         "Repository #{PRIVATE_REPO}", "Workflow SomeWorkflow.yml | Branch SomeBranch",
-        "https://nightly.link/#{PRIVATE_REPO}/workflows/SomeWorkflow/SomeBranch/SomeArtifact?h=6c9bf24563d1896f5de321ce6043413f8c75ef16",
-        "https://nightly.link/#{PRIVATE_REPO}/workflows/SomeWorkflow/SomeBranch/SomeArtifact.zip?h=6c9bf24563d1896f5de321ce6043413f8c75ef16",
+        "https://nightly.link/#{PRIVATE_REPO}/workflows/SomeWorkflow/SomeBranch/Some%23Artifact?h=6c9bf24563d1896f5de321ce6043413f8c75ef16",
+        "https://nightly.link/#{PRIVATE_REPO}/workflows/SomeWorkflow/SomeBranch/Some%23Artifact.zip?h=6c9bf24563d1896f5de321ce6043413f8c75ef16",
       ]
       assert_nofollow
     end
@@ -241,8 +241,8 @@ describe "dash_by_branch" do
     assert_contents [
       "Repository UserName/RepoName", "Workflow SomeWorkflow.yaml | Branch SomeBranch",
       "Repository UserName/RepoName", "Workflow SomeWorkflow.yaml | Branch SomeBranch",
-      "https://nightly.link/UserName/RepoName/workflows/SomeWorkflow.yaml/SomeBranch/SomeArtifact",
-      "https://nightly.link/UserName/RepoName/workflows/SomeWorkflow.yaml/SomeBranch/SomeArtifact.zip",
+      "https://nightly.link/UserName/RepoName/workflows/SomeWorkflow.yaml/SomeBranch/Some%23Artifact",
+      "https://nightly.link/UserName/RepoName/workflows/SomeWorkflow.yaml/SomeBranch/Some%23Artifact.zip",
     ]
     assert_nofollow
   end
@@ -251,7 +251,7 @@ end
 describe "dash_by_run" do
   before_each do
     WebMock.stub(:get, "https://api.github.com/repos/username/reponame/actions/runs/#{RUN_1}/artifacts?per_page=100").to_return(
-      body: %({"artifacts":[{"id":#{ARTIFACT_1},"name":"SomeArtifact","url":"https://api.github.com/repos/UserName/RepoName/actions/artifacts/#{ARTIFACT_1}"}]}))
+      body: %({"artifacts":[{"id":#{ARTIFACT_1},"name":"Some#Artifact","url":"https://api.github.com/repos/UserName/RepoName/actions/artifacts/#{ARTIFACT_1}"}]}))
   end
 
   test do
@@ -260,9 +260,9 @@ describe "dash_by_run" do
     assert_contents [
       "Repository UserName/RepoName", "Run ##{RUN_1}",
       "Repository UserName/RepoName", "Run ##{RUN_1}",
-      "https://nightly.link/UserName/RepoName/actions/runs/#{RUN_1}/SomeArtifact",
-      "https://nightly.link/UserName/RepoName/actions/runs/#{RUN_1}/SomeArtifact.zip",
-      "https://nightly.link/UserName/RepoName/actions/runs/#{RUN_1}/SomeArtifact.zip",
+      "https://nightly.link/UserName/RepoName/actions/runs/#{RUN_1}/Some%23Artifact",
+      "https://nightly.link/UserName/RepoName/actions/runs/#{RUN_1}/Some%23Artifact.zip",
+      "https://nightly.link/UserName/RepoName/actions/runs/#{RUN_1}/Some%23Artifact.zip",
     ]
     assert_nofollow
   end
@@ -291,20 +291,20 @@ describe "by_branch" do
                 {"id":#{RUN_2},"event":"schedule","workflow_id":#{WORKFLOW_1},"check_suite_url":"https://api.github.com/repos/UserName/RepoName/check-suites/#{CHECK_SUITE_1}","updated_at":"2021-02-07T07:15:00Z","repository":{"full_name":"UserName/RepoName","private":false,"fork":false}}]}))
     WebMock.stub(:get, "https://api.github.com/repos/username/reponame/actions/runs/#{RUN_2}/artifacts?per_page=100").to_return(
       body: %({"artifacts":[
-                {"id":#{ARTIFACT_1},"name":"SomeArtifact","url":"https://api.github.com/repos/UserName/RepoName/actions/artifacts/#{ARTIFACT_1}"},
+                {"id":#{ARTIFACT_1},"name":"Some#Artifact","url":"https://api.github.com/repos/UserName/RepoName/actions/artifacts/#{ARTIFACT_1}"},
                 {"id":#{ARTIFACT_2},"name":"AnotherArtifact","url":"https://api.github.com/repos/UserName/RepoName/actions/artifacts/#{ARTIFACT_2}"}]}))
     WebMock.stub(:get, "https://api.github.com/repos/username/reponame/actions/artifacts/#{ARTIFACT_1}/zip").to_return(
       headers: HTTP::Headers{"location" => "http://example.org/download1"})
   end
 
   test do
-    resp, body = serve("/UserName/RepoName/workflows/SomeWorkflow/SomeBranch/SomeArtifact")
-    assert_canonical "https://nightly.link/UserName/RepoName/workflows/SomeWorkflow/SomeBranch/SomeArtifact"
+    resp, body = serve("/UserName/RepoName/workflows/SomeWorkflow/SomeBranch/Some%23Artifact")
+    assert_canonical "https://nightly.link/UserName/RepoName/workflows/SomeWorkflow/SomeBranch/Some%23Artifact"
     assert_contents [
-      "Repository UserName/RepoName", "Workflow SomeWorkflow.yml | Branch SomeBranch | Artifact SomeArtifact",
+      "Repository UserName/RepoName", "Workflow SomeWorkflow.yml | Branch SomeBranch | Artifact Some#Artifact",
     ] * 2 + [
-      "https://nightly.link/UserName/RepoName/workflows/SomeWorkflow/SomeBranch/SomeArtifact.zip",
-      "https://nightly.link/UserName/RepoName/actions/runs/#{RUN_2}/SomeArtifact.zip",
+      "https://nightly.link/UserName/RepoName/workflows/SomeWorkflow/SomeBranch/Some%23Artifact.zip",
+      "https://nightly.link/UserName/RepoName/actions/runs/#{RUN_2}/Some%23Artifact.zip",
       "https://nightly.link/UserName/RepoName/actions/artifacts/#{ARTIFACT_1}.zip",
     ].flat_map { |s| [s, s] } + [
       "http://example.org/download1",
@@ -323,18 +323,18 @@ describe "by_branch" do
       body: %({"workflow_runs":[
                 {"id":#{RUN_2},"event":"schedule","workflow_id":#{WORKFLOW_1},"check_suite_url":"https://api.github.com/repos/UserName/RepoName/check-suites/#{CHECK_SUITE_1}","updated_at":"2021-02-07T07:15:00Z","repository":{"full_name":"UserName/RepoName","private":false,"fork":false}}]}))
 
-    resp, body = serve("/UserName/RepoName/workflows/SomeWorkflow/SomeBranch/SomeArtifact?status=completed")
-    assert_canonical "https://nightly.link/UserName/RepoName/workflows/SomeWorkflow/SomeBranch/SomeArtifact"
+    resp, body = serve("/UserName/RepoName/workflows/SomeWorkflow/SomeBranch/Some%23Artifact?status=completed")
+    assert_canonical "https://nightly.link/UserName/RepoName/workflows/SomeWorkflow/SomeBranch/Some%23Artifact"
   end
 
   test "redirect" do
-    resp, body = serve("/UserName/RepoName/workflows/SomeWorkflow/SomeBranch/SomeArtifact.zip")
+    resp, body = serve("/UserName/RepoName/workflows/SomeWorkflow/SomeBranch/Some%23Artifact.zip")
     assert_redirect "http://example.org/download1"
   end
 
   describe "private" do
     test "without password" do
-      resp, body = serve("/#{PRIVATE_REPO}/workflows/SomeWorkflow/SomeBranch/SomeArtifact.zip")
+      resp, body = serve("/#{PRIVATE_REPO}/workflows/SomeWorkflow/SomeBranch/Some%23Artifact.zip")
       assert resp.status == HTTP::Status::NOT_FOUND
       assert_contents [
         "Repository not found:", "https://github.com/#{PRIVATE_REPO}",
@@ -343,7 +343,7 @@ describe "by_branch" do
     end
 
     test "with wrong password" do
-      resp, body = serve("/#{PRIVATE_REPO}/workflows/SomeWorkflow/SomeBranch/SomeArtifact.zip?h=4007f0bdefca32af97b5abbe49644bd3155fe6aa")
+      resp, body = serve("/#{PRIVATE_REPO}/workflows/SomeWorkflow/SomeBranch/Some%23Artifact.zip?h=4007f0bdefca32af97b5abbe49644bd3155fe6aa")
       assert resp.status == HTTP::Status::NOT_FOUND
       assert_contents [
         "Repository not found:", "https://github.com/#{PRIVATE_REPO}",
@@ -360,16 +360,16 @@ describe "by_branch" do
                   {"id":#{RUN_2},"event":"schedule","workflow_id":#{WORKFLOW_1},"check_suite_url":"https://api.github.com/repos/#{PRIVATE_REPO}/check-suites/#{CHECK_SUITE_1}","updated_at":"2021-02-07T07:15:00Z","repository":{"full_name":"#{PRIVATE_REPO}","private":false,"fork":false}}]}))
       WebMock.stub(:get, "https://api.github.com/repos/#{PRIVATE_REPO}/actions/runs/#{RUN_2}/artifacts?per_page=100").to_return(
         body: %({"artifacts":[
-                  {"id":#{ARTIFACT_1},"name":"SomeArtifact","url":"https://api.github.com/repos/#{PRIVATE_REPO}/actions/artifacts/#{ARTIFACT_1}"},
+                  {"id":#{ARTIFACT_1},"name":"Some%23Artifact","url":"https://api.github.com/repos/#{PRIVATE_REPO}/actions/artifacts/#{ARTIFACT_1}"},
                   {"id":#{ARTIFACT_2},"name":"AnotherArtifact","url":"https://api.github.com/repos/#{PRIVATE_REPO}/actions/artifacts/#{ARTIFACT_2}"}]}))
       WebMock.stub(:get, "https://api.github.com/repos/#{PRIVATE_REPO}/actions/artifacts/#{ARTIFACT_1}/zip").to_return(
         headers: HTTP::Headers{"location" => "http://example.org/download2"})
 
-      resp, body = serve("/#{PRIVATE_REPO}/workflows/SomeWorkflow/SomeBranch/SomeArtifact?h=6c9bf24563d1896f5de321ce6043413f8c75ef16")
-      assert_canonical "https://nightly.link/#{PRIVATE_REPO}/workflows/SomeWorkflow/SomeBranch/SomeArtifact?h=6c9bf24563d1896f5de321ce6043413f8c75ef16"
+      resp, body = serve("/#{PRIVATE_REPO}/workflows/SomeWorkflow/SomeBranch/Some%23Artifact?h=6c9bf24563d1896f5de321ce6043413f8c75ef16")
+      assert_canonical "https://nightly.link/#{PRIVATE_REPO}/workflows/SomeWorkflow/SomeBranch/Some%23Artifact?h=6c9bf24563d1896f5de321ce6043413f8c75ef16"
       assert_contents [
-        "https://nightly.link/#{PRIVATE_REPO}/workflows/SomeWorkflow/SomeBranch/SomeArtifact.zip?h=6c9bf24563d1896f5de321ce6043413f8c75ef16",
-        "https://nightly.link/#{PRIVATE_REPO}/actions/runs/#{RUN_2}/SomeArtifact.zip?h=6c9bf24563d1896f5de321ce6043413f8c75ef16",
+        "https://nightly.link/#{PRIVATE_REPO}/workflows/SomeWorkflow/SomeBranch/Some%23Artifact.zip?h=6c9bf24563d1896f5de321ce6043413f8c75ef16",
+        "https://nightly.link/#{PRIVATE_REPO}/actions/runs/#{RUN_2}/Some%23Artifact.zip?h=6c9bf24563d1896f5de321ce6043413f8c75ef16",
         "https://nightly.link/#{PRIVATE_REPO}/actions/artifacts/#{ARTIFACT_1}.zip?h=6c9bf24563d1896f5de321ce6043413f8c75ef16",
       ].flat_map { |s| [s, s] } + [
         "http://example.org/download2",
@@ -385,18 +385,18 @@ end
 describe "by_run" do
   before_each do
     WebMock.stub(:get, "https://api.github.com/repos/username/reponame/actions/runs/#{RUN_1}/artifacts?per_page=100").to_return(
-      body: %({"artifacts":[{"id":#{ARTIFACT_1},"name":"SomeArtifact","url":"https://api.github.com/repos/UserName/RepoName/actions/artifacts/#{ARTIFACT_1}"}]}))
+      body: %({"artifacts":[{"id":#{ARTIFACT_1},"name":"Some#Artifact","url":"https://api.github.com/repos/UserName/RepoName/actions/artifacts/#{ARTIFACT_1}"}]}))
     WebMock.stub(:get, "https://api.github.com/repos/username/reponame/actions/artifacts/#{ARTIFACT_1}/zip").to_return(
       headers: HTTP::Headers{"location" => "http://example.org/download1"})
   end
 
   test do
-    resp, body = serve("/UserName/RepoName/actions/runs/#{RUN_1}/SomeArtifact")
-    assert_canonical "https://nightly.link/UserName/RepoName/actions/runs/#{RUN_1}/SomeArtifact"
+    resp, body = serve("/UserName/RepoName/actions/runs/#{RUN_1}/Some%23Artifact")
+    assert_canonical "https://nightly.link/UserName/RepoName/actions/runs/#{RUN_1}/Some%23Artifact"
     assert_contents [
-      "Repository UserName/RepoName", "Run ##{RUN_1} | Artifact SomeArtifact",
+      "Repository UserName/RepoName", "Run ##{RUN_1} | Artifact Some#Artifact",
     ] * 2 + [
-      "https://nightly.link/UserName/RepoName/actions/runs/#{RUN_1}/SomeArtifact.zip",
+      "https://nightly.link/UserName/RepoName/actions/runs/#{RUN_1}/Some%23Artifact.zip",
       "https://nightly.link/UserName/RepoName/actions/artifacts/#{ARTIFACT_1}.zip",
     ].flat_map { |s| [s, s] } + [
       "http://example.org/download1",
@@ -406,7 +406,7 @@ describe "by_run" do
   end
 
   test "redirect" do
-    resp, body = serve("/UserName/RepoName/actions/runs/#{RUN_1}/SomeArtifact.zip")
+    resp, body = serve("/UserName/RepoName/actions/runs/#{RUN_1}/Some%23Artifact.zip")
     assert_redirect "http://example.org/download1"
   end
 end

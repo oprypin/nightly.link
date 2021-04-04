@@ -6,7 +6,7 @@ shards:
 
   cron_parser:
     git: https://github.com/kostya/cron_parser.git
-    version: 0.3.0
+    version: 0.4.0
 
   db:
     git: https://github.com/crystal-lang/crystal-db.git
@@ -30,7 +30,7 @@ shards:
 
   memory_cache:
     git: https://github.com/kostya/memory_cache.git
-    version: 0.4
+    version: 0.4.1
 
   openssl_ext:
     git: https://github.com/spider-gazelle/openssl_ext.git
@@ -38,7 +38,7 @@ shards:
 
   retour:
     git: https://github.com/oprypin/retour.git
-    version: 0.1.0+git.commit.dc75db45385ce77bea71aa2ef6081d12495500bf
+    version: 0.1.0+git.commit.a6f1ace593ecc672e7596b4e00e5e9022eed50f9
 
   spec_assert:
     git: https://github.com/oprypin/spec-assert.git
