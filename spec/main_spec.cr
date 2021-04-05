@@ -360,7 +360,7 @@ describe "by_branch" do
                   {"id":#{RUN_2},"event":"schedule","workflow_id":#{WORKFLOW_1},"check_suite_url":"https://api.github.com/repos/#{PRIVATE_REPO}/check-suites/#{CHECK_SUITE_1}","updated_at":"2021-02-07T07:15:00Z","repository":{"full_name":"#{PRIVATE_REPO}","private":false,"fork":false}}]}))
       WebMock.stub(:get, "https://api.github.com/repos/#{PRIVATE_REPO}/actions/runs/#{RUN_2}/artifacts?per_page=100").to_return(
         body: %({"artifacts":[
-                  {"id":#{ARTIFACT_1},"name":"Some%23Artifact","url":"https://api.github.com/repos/#{PRIVATE_REPO}/actions/artifacts/#{ARTIFACT_1}"},
+                  {"id":#{ARTIFACT_1},"name":"Some#Artifact","url":"https://api.github.com/repos/#{PRIVATE_REPO}/actions/artifacts/#{ARTIFACT_1}"},
                   {"id":#{ARTIFACT_2},"name":"AnotherArtifact","url":"https://api.github.com/repos/#{PRIVATE_REPO}/actions/artifacts/#{ARTIFACT_2}"}]}))
       WebMock.stub(:get, "https://api.github.com/repos/#{PRIVATE_REPO}/actions/artifacts/#{ARTIFACT_1}/zip").to_return(
         headers: HTTP::Headers{"location" => "http://example.org/download2"})
