@@ -246,9 +246,9 @@ class NightlyLink
     )
 
     ctx.response.content_type = "text/html"
-    ECR.embed("templates/head.html", ctx.response)
+    ECR.embed("#{__DIR__}/../templates/head.html", ctx.response)
     ctx.response.puts("<title>nightly.link</title>")
-    ECR.embed("README.html", ctx.response)
+    ECR.embed("#{__DIR__}/../README.html", ctx.response)
   end
 
   @[Retour::Get("/dashboard")]
@@ -286,8 +286,8 @@ class NightlyLink
     ctx.response.headers["X-Robots-Tag"] = "noindex"
 
     canonical = abs_url(NightlyLink.gen_dashboard)
-    ECR.embed("templates/head.html", ctx.response)
-    ECR.embed("templates/dashboard.html", ctx.response)
+    ECR.embed("#{__DIR__}/../templates/head.html", ctx.response)
+    ECR.embed("#{__DIR__}/../templates/dashboard.html", ctx.response)
   end
 
   @[Retour::Get("/setup")]
@@ -350,8 +350,8 @@ class NightlyLink
     canonical += "?h=#{h}" if h
 
     ctx.response.content_type = "text/html"
-    ECR.embed("templates/head.html", ctx.response)
-    ECR.embed("templates/artifact_list.html", ctx.response)
+    ECR.embed("#{__DIR__}/../templates/head.html", ctx.response)
+    ECR.embed("#{__DIR__}/../templates/artifact_list.html", ctx.response)
   end
 
   @[Retour::Get("/{repo_owner}/{repo_name}/actions/runs/{run_id:[0-9]+}")]
@@ -390,8 +390,8 @@ class NightlyLink
     message = nil
 
     ctx.response.content_type = "text/html"
-    ECR.embed("templates/head.html", ctx.response)
-    ECR.embed("templates/artifact_list.html", ctx.response)
+    ECR.embed("#{__DIR__}/../templates/head.html", ctx.response)
+    ECR.embed("#{__DIR__}/../templates/artifact_list.html", ctx.response)
   end
 
   private def get_latest_run(
@@ -475,8 +475,8 @@ class NightlyLink
     return links if ctx.nil?
     links.reverse!
     ctx.response.content_type = "text/html"
-    ECR.embed("templates/head.html", ctx.response)
-    ECR.embed("templates/artifact.html", ctx.response)
+    ECR.embed("#{__DIR__}/../templates/head.html", ctx.response)
+    ECR.embed("#{__DIR__}/../templates/artifact.html", ctx.response)
   end
 
   @[Retour::Get("/{repo_owner}/{repo_name}/actions/runs/{run_id:[0-9]+}/{artifact}{zip:\\.zip}")]
@@ -520,8 +520,8 @@ class NightlyLink
     return links if ctx.nil?
     links.reverse!
     ctx.response.content_type = "text/html"
-    ECR.embed("templates/head.html", ctx.response)
-    ECR.embed("templates/artifact.html", ctx.response)
+    ECR.embed("#{__DIR__}/../templates/head.html", ctx.response)
+    ECR.embed("#{__DIR__}/../templates/artifact.html", ctx.response)
   end
 
   @[Retour::Get("/{repo_owner}/{repo_name}/actions/artifacts/{artifact_id:[0-9]+}{zip:\\.zip}")]
@@ -575,8 +575,8 @@ class NightlyLink
     return links if ctx.nil?
     links.reverse!
     ctx.response.content_type = "text/html"
-    ECR.embed("templates/head.html", ctx.response)
-    ECR.embed("templates/artifact.html", ctx.response)
+    ECR.embed("#{__DIR__}/../templates/head.html", ctx.response)
+    ECR.embed("#{__DIR__}/../templates/artifact.html", ctx.response)
   end
 
   @[Retour::Get("/{repo_owner}/{repo_name}/runs/{job_id:[0-9]+}{txt:\\.txt}")]
@@ -617,8 +617,8 @@ class NightlyLink
     title = {"Repository #{repo_owner}/#{repo_name}", "Job ##{job_id}"}
 
     ctx.response.content_type = "text/html"
-    ECR.embed("templates/head.html", ctx.response)
-    ECR.embed("templates/job.html", ctx.response)
+    ECR.embed("#{__DIR__}/../templates/head.html", ctx.response)
+    ECR.embed("#{__DIR__}/../templates/job.html", ctx.response)
   end
 
   {% for name, path in {style: "style.css", logo: "logo.svg"} %}
@@ -632,11 +632,11 @@ class NightlyLink
     @[Retour::Get({{"/#{path.id}"}})]
     def static_{{name}}(ctx)
       ctx.response.headers.merge!({{headers}})
-      ctx.response << {{read_file(path.id)}}
+      ctx.response << {{read_file("#{__DIR__}/../#{path.id}")}}
     end
 
     def self.gen_{{name}}
-      {{"/#{path.id}?#{`sha1sum #{path}`[0...10]}"}}
+      {{"/#{path.id}?#{`sha1sum #{__DIR__}/../#{path.id}`[0...10]}"}}
     end
   {% end %}
 
@@ -660,8 +660,8 @@ class NightlyLink
     ctx.response.headers.merge!(exception.headers)
     return if status.redirection?
     canonical = nil
-    ECR.embed("templates/head.html", ctx.response)
-    ECR.embed("templates/error.html", ctx.response)
+    ECR.embed("#{__DIR__}/../templates/head.html", ctx.response)
+    ECR.embed("#{__DIR__}/../templates/error.html", ctx.response)
   end
 end
 
