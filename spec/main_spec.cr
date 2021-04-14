@@ -106,6 +106,12 @@ describe "index" do
       assert_redirect "/oprypin/nightly.link/runs/1849327325"
     end
 
+    test "private" do
+      url = URI.encode_www_form("https://github.com/#{PRIVATE_REPO}/blob/SomeBranch/.github/workflows/SomeWorkflow.yml")
+      resp, body = serve("/?url=#{url}&h=6c9bf24563d1896f5de321ce6043413f8c75ef16")
+      assert_redirect "/#{PRIVATE_REPO}/workflows/SomeWorkflow/SomeBranch?h=6c9bf24563d1896f5de321ce6043413f8c75ef16"
+    end
+
     test "bad url" do
       resp, body = serve("/?url=https://hmm")
       assert resp.status == HTTP::Status::OK

@@ -220,6 +220,7 @@ class NightlyLink
       when Retour::NotFound
         messages << "Did not detect a link to a GitHub workflow file, actions run, or artifact." << gh_path
       else
+        new_path += "?h=#{h}" if h
         raise HTTPException.redirect(new_path)
       end
     end
