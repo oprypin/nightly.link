@@ -56,7 +56,7 @@ The raw log download link is in the same situation as artifacts: <u>nightly.link
 <summary>Bot that comments on pull requests</summary>
 <p>For projects developing an application, it is useful to quickly try out the executable built from the code of an incoming <a href="https://docs.github.com/en/github/collaborating-with-issues-and-pull-requests/about-pull-requests">pull request</a>. You can do this normally by clicking into a finished GitHub Actions job, then into its parent run, then scrolling down to the list of artifacts.</p>
 <p>Instead, you can opt into a much more convenient approach: add a "bot" that replies with links directly to the artifacts, as soon as the pull request finishes building.</p>
-<p><a href="https://github.com/oprypin/nightly.link/pull/10">Here's how it looks</a>. Apply it to your repository by copying <a href="https://github.com/oprypin/nightly.link/blob/master/.github/workflows/pr-comment.yml">the sample workflow file</a>.</p>
+<p><a href="https://github.com/oprypin/nightly.link/pull/10">Here's how it looks</a>. Apply it to your repository by copying <a href="https://github.com/oprypin/nightly.link/blob/master/.github/workflows/pr-comment.yml">the sample workflow file</a>. Note that it must be added to the main branch and be fully submitted/merged before it will do anything.</p>
 <p>Another advantage that this gives is that users that aren't logged into GitHub can download the artifacts as well. If you don't care about that, you can adapt the sample workflow to link directly to github.com, without relying on this site.</p>
 <p>Note that this ability is not actually part of <u>nightly.link</u>, just a creative way to apply it; the "bot" is executed entirely within GitHub Actions, isolated to your repository.</p>
 </details>
