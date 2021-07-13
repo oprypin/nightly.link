@@ -38,7 +38,7 @@ shards:
 
   retour:
     git: https://github.com/oprypin/retour.git
-    version: 0.1.0+git.commit.a6f1ace593ecc672e7596b4e00e5e9022eed50f9
+    version: 0.1.0+git.commit.0e408cb9739bda53913f54139666d90353b87ca2
 
   spec_assert:
     git: https://github.com/oprypin/spec-assert.git

@@ -106,6 +106,11 @@ describe "index" do
       assert_redirect "/oprypin/nightly.link/runs/1849327325"
     end
 
+    test "unicode url" do
+      resp, body = serve("/?url=" + URI.encode_www_form("https://github.com/oprypin/nightly.link/blob/%D1%82%D0%B5%D1%81%D1%82/.github/workflows/build.yml"))
+      assert_redirect "/oprypin/nightly.link/workflows/build/%D1%82%D0%B5%D1%81%D1%82"
+    end
+
     test "private" do
       url = URI.encode_www_form("https://github.com/#{PRIVATE_REPO}/blob/SomeBranch/.github/workflows/SomeWorkflow.yml")
       resp, body = serve("/?url=#{url}&h=6c9bf24563d1896f5de321ce6043413f8c75ef16")
