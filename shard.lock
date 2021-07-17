@@ -2,7 +2,7 @@ version: 2.0
 shards:
   bindata:
     git: https://github.com/spider-gazelle/bindata.git
-    version: 1.8.3
+    version: 1.9.0
 
   cron_parser:
     git: https://github.com/kostya/cron_parser.git
@@ -14,7 +14,7 @@ shards:
 
   future:
     git: https://github.com/crystal-community/future.cr.git
-    version: 0.1.0
+    version: 1.0.0
 
   halite:
     git: https://github.com/icyleaf/halite.git
@@ -34,7 +34,7 @@ shards:
 
   openssl_ext:
     git: https://github.com/spider-gazelle/openssl_ext.git
-    version: 2.1.4
+    version: 2.1.5
 
   retour:
     git: https://github.com/oprypin/retour.git
@@ -50,7 +50,7 @@ shards:
 
   tasker:
     git: https://github.com/spider-gazelle/tasker.git
-    version: 2.0.3
+    version: 2.0.5
 
   webmock:
     git: https://github.com/manastech/webmock.cr.git
