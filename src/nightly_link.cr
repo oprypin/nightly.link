@@ -149,7 +149,7 @@ module GitHubRoutes
   extend self
   include Retour::HTTPRouter
 
-  @[Retour::Get("/{repo_owner}/{repo_name}/{_kind:blob|tree|raw|blame|commits}/{branch}/.github/workflows/{workflow:[^/]+\\.ya?ml}")]
+  @[Retour::Get("/{repo_owner}/{repo_name}/{_kind:blob|tree|raw|blame|commits}/{branch:.+}/.github/workflows/{workflow:[^/]+\\.ya?ml}")]
   def workflow_file(repo_owner, repo_name, _kind, branch, workflow, direct : Bool)
     NightlyLink.gen_dash_by_branch(repo_owner: repo_owner, repo_name: repo_name, workflow: workflow.rchop(".yml"), branch: branch)
   end
@@ -188,7 +188,7 @@ class NightlyLink
   })
 
   def workflow_pattern(repo_owner : String, repo_name : String) : Regex
-    %r(^https?://github.com/(#{repo_owner})/(#{repo_name})/(blob|tree|raw|blame|commits)/([^/]+)/\.github/workflows/([^/]+\.ya?ml)(#.*)?$)
+    %r(^https?://github.com/(#{repo_owner})/(#{repo_name})/(blob|tree|raw|blame|commits)/(.+)/\.github/workflows/([^/]+\.ya?ml)(#.*)?$)
   end
 
   def workflow_placeholder(repo_owner = "$user", repo_name = "$repo") : String
