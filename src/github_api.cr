@@ -230,7 +230,7 @@ end
 
 struct WorkflowRuns
   include JSON::Serializable
-  property workflow_runs : Array(WorkflowRun)
+  property workflow_runs : Array(WorkflowRun) = [] of WorkflowRun
 
   cached_array def self.for_workflow(
     repo_owner : DowncaseString, repo_name : DowncaseString, workflow : String,
