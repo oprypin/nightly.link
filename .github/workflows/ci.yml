@@ -1,5 +1,3 @@
-name: CI
-
 on:
   push:
   pull_request:
@@ -11,20 +9,8 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - name: Install Crystal
-        uses: oprypin/install-crystal@v1
-      - name: Download source
-        uses: actions/checkout@v2
-      - name: Cache dependencies
-        uses: actions/cache@v2
+      - run: mkdir foo && touch foo/bar.txt
+      - uses: actions/upload-artifact@v2
         with:
-          path: lib
-          key: ${{ runner.os }}-shards-${{ hashFiles('**/shard.lock') }}
-      - name: Install dependencies
-        run: shards check || shards install --ignore-crystal-version
-      - name: Build
-        run: make -j
-      - name: Run tests
-        run: make -j test
-      - name: Check formatting
-        run: crystal tool format --check
+          path: foo/bar.txt
+          name: bar
