@@ -37,23 +37,10 @@ jobs:
 
             const {owner, repo} = context.repo;
             const run_id = ${{github.event.workflow_run.id}};
-            const pull_head_sha = '${{github.event.workflow_run.head_sha}}';
-            const pull_user_id = ${{github.event.sender.id}};
 
-            const issue_number = await (async () => {
-              const pulls = await github.pulls.list({owner, repo});
-              for await (const {data} of github.paginate.iterator(pulls)) {
-                for (const pull of data) {
-                  if (pull.head.sha === pull_head_sha && pull.user.id === pull_user_id) {
-                    return pull.number;
-                  }
-                }
-              }
-            })();
-            if (issue_number) {
-              core.info(`Using pull request ${issue_number}`);
-            } else {
-              return core.error(`No matching pull request found`);
+            const pull_requests = ${{ toJSON(github.event.workflow_run.pull_requests) }};
+            if (!pull_requests.length) {
+              return core.error("This workflow doesn't match any pull requests!");
             }
 
             const {data: {artifacts}} = await github.actions.listWorkflowRunArtifacts({owner, repo, run_id});
@@ -65,4 +52,7 @@ jobs:
               body += `\n* [${art.name}.zip](https://nightly.link/${owner}/${repo}/actions/artifacts/${art.id}.zip)`;
             }
 
-            await upsertComment(owner, repo, issue_number, "nightly-link", body);
+            for (const pr of pull_requests) {
+              await upsertComment(owner, repo, pr.number,
+                "nightly-link", body);
+            }
