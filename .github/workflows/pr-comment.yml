@@ -53,6 +53,8 @@ jobs:
               body += `\n* [${art.name}.zip](https://nightly.link/${owner}/${repo}/actions/artifacts/${art.id}.zip)`;
             }
 
+            core.info("Review thread message body:", body);
+
             for (const pr of pull_requests) {
               await upsertComment(owner, repo, pr.number,
                 "nightly-link", body);
