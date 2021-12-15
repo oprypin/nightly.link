@@ -8,13 +8,13 @@ jobs:
     if: github.event.workflow_run.event == 'pull_request' && github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/github-script@v3
+      - uses: actions/github-script@v5
         with:
           # This snippet is public-domain, taken from
           # https://github.com/oprypin/nightly.link/blob/master/.github/workflows/pr-comment.yml
           script: |
             async function upsertComment(owner, repo, issue_number, purpose, body) {
-              const {data: comments} = await github.issues.listComments(
+              const {data: comments} = await github.rest.issues.listComments(
                 {owner, repo, issue_number});
 
               const marker = `<!-- bot: ${purpose} -->`;
@@ -24,14 +24,14 @@ jobs:
               if (existing.length > 0) {
                 const last = existing[existing.length - 1];
                 core.info(`Updating comment ${last.id}`);
-                await github.issues.updateComment({
+                await github.rest.issues.updateComment({
                   owner, repo,
                   body,
                   comment_id: last.id,
                 });
               } else {
                 core.info(`Creating a comment in issue / PR #${issue_number}`);
-                await github.issues.createComment({issue_number, body, owner, repo});
+                await github.rest.issues.createComment({issue_number, body, owner, repo});
               }
             }
 
@@ -43,7 +43,8 @@ jobs:
               return core.error("This workflow doesn't match any pull requests!");
             }
 
-            const {data: {artifacts}} = await github.actions.listWorkflowRunArtifacts({owner, repo, run_id});
+            const artifacts = await github.paginate(
+              github.rest.actions.listWorkflowRunArtifacts, {owner, repo, run_id});
             if (!artifacts.length) {
               return core.error(`No artifacts found`);
             }
