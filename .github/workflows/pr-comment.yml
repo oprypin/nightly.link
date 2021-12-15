@@ -13,6 +13,28 @@ jobs:
           # This snippet is public-domain, taken from
           # https://github.com/oprypin/nightly.link/blob/master/.github/workflows/pr-comment.yml
           script: |
+            async function upsertComment(owner, repo, issue_number, purpose, body) {
+              const {data: comments} = await github.issues.listComments(
+                {owner, repo, issue_number});
+
+              const marker = `<!-- bot: ${purpose} -->`;
+              body = marker + "\n" + body;
+
+              const existing = comments.filter((c) => c.body.includes(marker));
+              if (existing.length > 0) {
+                const last = existing[existing.length - 1];
+                core.info(`Updating comment ${last.id}`);
+                await github.issues.updateComment({
+                  owner, repo,
+                  body,
+                  comment_id: last.id,
+                });
+              } else {
+                core.info(`Creating a comment in issue / PR #${issue_number}`);
+                await github.issues.createComment({issue_number, body, owner, repo});
+              }
+            }
+
             const {owner, repo} = context.repo;
             const run_id = ${{github.event.workflow_run.id}};
             const pull_head_sha = '${{github.event.workflow_run.head_sha}}';
@@ -43,12 +65,4 @@ jobs:
               body += `\n* [${art.name}.zip](https://nightly.link/${owner}/${repo}/actions/artifacts/${art.id}.zip)`;
             }
 
-            const {data: comments} = await github.issues.listComments({repo, owner, issue_number});
-            const existing_comment = comments.find((c) => c.user.login === 'github-actions[bot]');
-            if (existing_comment) {
-              core.info(`Updating comment ${existing_comment.id}`);
-              await github.issues.updateComment({repo, owner, comment_id: existing_comment.id, body});
-            } else {
-              core.info(`Creating a comment`);
-              await github.issues.createComment({repo, owner, issue_number, body});
-            }
+            await upsertComment(owner, repo, issue_number, "nightly-link", body);
