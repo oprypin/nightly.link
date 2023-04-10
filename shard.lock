@@ -2,7 +2,7 @@ version: 2.0
 shards:
   bindata:
     git: https://github.com/spider-gazelle/bindata.git
-    version: 1.9.0
+    version: 1.11.1
 
   cron_parser:
     git: https://github.com/kostya/cron_parser.git
@@ -10,7 +10,7 @@ shards:
 
   db:
     git: https://github.com/crystal-lang/crystal-db.git
-    version: 0.10.1
+    version: 0.11.0
 
   future:
     git: https://github.com/crystal-community/future.cr.git
@@ -22,11 +22,11 @@ shards:
 
   jwt:
     git: https://github.com/crystal-community/jwt.git
-    version: 1.5.1
+    version: 1.6.0
 
   markd:
     git: https://github.com/icyleaf/markd.git
-    version: 0.4.0
+    version: 0.5.0
 
   memory_cache:
     git: https://github.com/kostya/memory_cache.git
@@ -34,23 +34,23 @@ shards:
 
   openssl_ext:
     git: https://github.com/spider-gazelle/openssl_ext.git
-    version: 2.1.5
+    version: 2.3.0
 
   retour:
     git: https://github.com/oprypin/retour.git
-    version: 0.1.0+git.commit.0e408cb9739bda53913f54139666d90353b87ca2
+    version: 0.1.0+git.commit.83b77b7511f1ef7c02e3418cffc123832b7eae5f
 
   spec_assert:
     git: https://github.com/oprypin/spec-assert.git
-    version: 0.1.0+git.commit.a5d589716e075deaf5a106a169f528e3a47a04a3
+    version: 0.1.0+git.commit.abae47331aa85f7fdbd3ba406c91e7a1f77f56b9
 
   sqlite3:
     git: https://github.com/crystal-lang/crystal-sqlite3.git
-    version: 0.18.0
+    version: 0.19.0
 
   tasker:
     git: https://github.com/spider-gazelle/tasker.git
-    version: 2.0.5
+    version: 2.0.7
 
   webmock:
     git: https://github.com/manastech/webmock.cr.git
