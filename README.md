@@ -1,4 +1,4 @@
-<h1>nightly.link <img src="logo.svg" alt="" height="24" style="height: 32px; vertical-align: sub"> for GitHub
+<h1>nightly.link <img src="logo.svg" alt="" height="24" style="height: 34px; vertical-align: sub"> for GitHub
 <a href="https://github.com/oprypin/nightly.link"><img src="https://img.shields.io/github/stars/oprypin/nightly.link?style=social" alt="" style="float: right; height: 30px; margin-top: 10px"></a>
 </h1>
 

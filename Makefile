@@ -4,7 +4,7 @@ release ?=
 md_files = $(wildcard *.md)
 html_files := $(md_files:.md=.html)
 vendored_files := style.css
-all_sources := src/nightly_link.cr $(wildcard src/*.cr) $(html_files) $(wildcard templates/*.html) $(vendored_files)
+all_sources := src/nightly_link.cr $(wildcard src/*.cr) $(html_files) $(wildcard templates/*.html) logo.svg $(vendored_files)
 
 nightly_link: $(all_sources)
 	$(CRYSTAL) build --error-trace $(if $(release),--release )$<
@@ -18,7 +18,7 @@ render_md: src/render_md.cr
 style.css: assets/style.css Makefile
 	(cat assets/style.css && \
 	 echo '/* https://github.com/sindresorhus/github-markdown-css */' && \
-	 curl https://cdnjs.cloudflare.com/ajax/libs/github-markdown-css/4.0.0/github-markdown.css | sed 's/\.markdown-body/article/' \
+	 curl https://cdnjs.cloudflare.com/ajax/libs/github-markdown-css/5.2.0/github-markdown.css | sed 's/\.markdown-body/article/' \
 	) >style.css
 
 lib: shard.lock

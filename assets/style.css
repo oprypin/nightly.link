@@ -19,7 +19,9 @@ body>article {
 
 details {
     background-color: #f9f9f9;
+    background-color: rgba(160, 160, 160, 0.07);
     border-left: 2px solid #ccc;
+    border-left-color: rgba(140, 140, 140, 0.4);
     padding: 5px;
 }
 details summary {
