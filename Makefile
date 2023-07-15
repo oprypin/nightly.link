@@ -18,7 +18,7 @@ render_md: src/render_md.cr
 style.css: assets/style.css Makefile
 	(cat assets/style.css && \
 	 echo '/* https://github.com/sindresorhus/github-markdown-css */' && \
-	 curl https://cdnjs.cloudflare.com/ajax/libs/github-markdown-css/5.2.0/github-markdown.css | sed 's/\.markdown-body/article/' \
+	 curl https://cdnjs.cloudflare.com/ajax/libs/github-markdown-css/5.2.0/github-markdown.css | sed -E 's/^ *\.markdown-body \{/body, article {/; s/\.markdown-body/article/' \
 	) >style.css
 
 lib: shard.lock
