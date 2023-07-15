@@ -247,7 +247,7 @@ class NightlyLink
     )
 
     ctx.response.content_type = "text/html"
-    ecr_body(ctx.response, canonical: canonical) do |io|
+    ecr_body(ctx.response, popup: true, canonical: canonical) do |io|
       ECR.embed("#{__DIR__}/../README.html", io)
     end
   end
@@ -672,7 +672,7 @@ class NightlyLink
     end
   end
 
-  def ecr_body(io, title = nil, canonical = nil, &block)
+  def ecr_body(io, title = nil, canonical = nil, popup = false, &block)
     ECR.embed("#{__DIR__}/../templates/body.html", io)
   end
 end

@@ -7,6 +7,9 @@
 <% if canonical %><link rel="canonical" href="<%= HTML.escape(canonical) %>"><% end %>
 <title>nightly.link<% if title %> | <%= HTML.escape(title) %><% end %></title>
 <body>
+<% if popup %>
+<aside><p>New: nightly.link <a href="#pricing">now accepts donations!</a></p></aside>
+<% end %>
 <article>
 <% yield io %>
 </article>

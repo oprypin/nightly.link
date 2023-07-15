@@ -17,6 +17,22 @@ body>article {
     }
 }
 
+body>aside {
+    background-color: #ffff88;
+    background-color: rgba(255, 255, 100, 0.9);
+    color: #24292e;
+}
+body>aside a {
+    color: #0969da;
+    text-decoration: none;
+}
+body>aside>* {
+    box-sizing: border-box;
+    padding: 8px 45px;
+    margin: 0 auto;
+    max-width: 980px;
+}
+
 details {
     background-color: #f9f9f9;
     background-color: rgba(160, 160, 160, 0.07);

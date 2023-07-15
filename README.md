@@ -73,6 +73,12 @@ This page will be updated if this changes.
 
 ## Pricing
 
+nightly.link is provided totally free of charge, including the main instance that has been running at the author's own expense.
+
+If you rely on the service, **please support its continued maintenance by donating to the author**.
+
+**[GitHub sponsors page of @oprypin](https://github.com/sponsors/oprypin)**
+
 No paid features are currently planned.
 
 ## Author
