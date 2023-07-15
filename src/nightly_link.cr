@@ -247,9 +247,9 @@ class NightlyLink
     )
 
     ctx.response.content_type = "text/html"
-    ECR.embed("#{__DIR__}/../templates/head.html", ctx.response)
-    ctx.response.puts("<title>nightly.link</title>")
-    ECR.embed("#{__DIR__}/../README.html", ctx.response)
+    ecr_body(ctx.response, canonical: canonical) do |io|
+      ECR.embed("#{__DIR__}/../README.html", io)
+    end
   end
 
   @[Retour::Get("/dashboard")]
@@ -287,8 +287,9 @@ class NightlyLink
     ctx.response.headers["X-Robots-Tag"] = "noindex"
 
     canonical = abs_url(NightlyLink.gen_dashboard)
-    ECR.embed("#{__DIR__}/../templates/head.html", ctx.response)
-    ECR.embed("#{__DIR__}/../templates/dashboard.html", ctx.response)
+    ecr_body(ctx.response, title: "Dashboard", canonical: canonical) do |io|
+      ECR.embed("#{__DIR__}/../templates/dashboard.html", io)
+    end
   end
 
   @[Retour::Get("/setup")]
@@ -351,8 +352,9 @@ class NightlyLink
     canonical += "?h=#{h}" if h
 
     ctx.response.content_type = "text/html"
-    ECR.embed("#{__DIR__}/../templates/head.html", ctx.response)
-    ECR.embed("#{__DIR__}/../templates/artifact_list.html", ctx.response)
+    ecr_body(ctx.response, title: title.join(" | "), canonical: canonical) do |io|
+      ECR.embed("#{__DIR__}/../templates/artifact_list.html", io)
+    end
   end
 
   @[Retour::Get("/{repo_owner}/{repo_name}/actions/runs/{run_id:[0-9]+}")]
@@ -391,8 +393,9 @@ class NightlyLink
     message = nil
 
     ctx.response.content_type = "text/html"
-    ECR.embed("#{__DIR__}/../templates/head.html", ctx.response)
-    ECR.embed("#{__DIR__}/../templates/artifact_list.html", ctx.response)
+    ecr_body(ctx.response, title: title.join(" | "), canonical: canonical) do |io|
+      ECR.embed("#{__DIR__}/../templates/artifact_list.html", io)
+    end
   end
 
   private def get_latest_run(
@@ -476,8 +479,9 @@ class NightlyLink
     return links if ctx.nil?
     links.reverse!
     ctx.response.content_type = "text/html"
-    ECR.embed("#{__DIR__}/../templates/head.html", ctx.response)
-    ECR.embed("#{__DIR__}/../templates/artifact.html", ctx.response)
+    ecr_body(ctx.response, title: title.join(" | "), canonical: canonical) do |io|
+      ECR.embed("#{__DIR__}/../templates/artifact.html", io)
+    end
   end
 
   @[Retour::Get("/{repo_owner}/{repo_name}/actions/runs/{run_id:[0-9]+}/{artifact}{zip:\\.zip}")]
@@ -521,8 +525,9 @@ class NightlyLink
     return links if ctx.nil?
     links.reverse!
     ctx.response.content_type = "text/html"
-    ECR.embed("#{__DIR__}/../templates/head.html", ctx.response)
-    ECR.embed("#{__DIR__}/../templates/artifact.html", ctx.response)
+    ecr_body(ctx.response, title: title.join(" | "), canonical: canonical) do |io|
+      ECR.embed("#{__DIR__}/../templates/artifact.html", io)
+    end
   end
 
   @[Retour::Get("/{repo_owner}/{repo_name}/actions/artifacts/{artifact_id:[0-9]+}{zip:\\.zip}")]
@@ -576,8 +581,9 @@ class NightlyLink
     return links if ctx.nil?
     links.reverse!
     ctx.response.content_type = "text/html"
-    ECR.embed("#{__DIR__}/../templates/head.html", ctx.response)
-    ECR.embed("#{__DIR__}/../templates/artifact.html", ctx.response)
+    ecr_body(ctx.response, title: title.join(" | "), canonical: canonical) do |io|
+      ECR.embed("#{__DIR__}/../templates/artifact.html", io)
+    end
   end
 
   @[Retour::Get("/{repo_owner}/{repo_name}/runs/{job_id:[0-9]+}{txt:\\.txt}")]
@@ -618,8 +624,9 @@ class NightlyLink
     title = {"Repository #{repo_owner}/#{repo_name}", "Job ##{job_id}"}
 
     ctx.response.content_type = "text/html"
-    ECR.embed("#{__DIR__}/../templates/head.html", ctx.response)
-    ECR.embed("#{__DIR__}/../templates/job.html", ctx.response)
+    ecr_body(ctx.response, title: title.join(" | "), canonical: canonical) do |io|
+      ECR.embed("#{__DIR__}/../templates/job.html", io)
+    end
   end
 
   {% for name, path in {style: "style.css", logo: "logo.svg"} %}
@@ -660,9 +667,13 @@ class NightlyLink
     ctx.response.status = status = exception.status
     ctx.response.headers.merge!(exception.headers)
     return if status.redirection?
-    canonical = nil
-    ECR.embed("#{__DIR__}/../templates/head.html", ctx.response)
-    ECR.embed("#{__DIR__}/../templates/error.html", ctx.response)
+    ecr_body(ctx.response) do |io|
+      ECR.embed("#{__DIR__}/../templates/error.html", io)
+    end
+  end
+
+  def ecr_body(io, title = nil, canonical = nil, &block)
+    ECR.embed("#{__DIR__}/../templates/body.html", io)
   end
 end
 
