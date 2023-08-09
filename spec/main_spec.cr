@@ -81,7 +81,7 @@ describe "index" do
       describe kind do
         test "workflow" do
           resp, body = serve("#{prefix}/oprypin/nightly.link/blob/master/.github/workflows/upload-test.yml")
-          assert_redirect "/oprypin/nightly.link/workflows/upload-test/master"
+          assert_redirect "/oprypin/nightly.link/workflows/upload-test/master?preview"
         end
 
         test "artifact_download" do
@@ -108,13 +108,13 @@ describe "index" do
 
     test "unicode url" do
       resp, body = serve("/?url=" + URI.encode_www_form("https://github.com/oprypin/nightly.link/blob/%D1%82%D0%B5%D1%81%D1%82/.github/workflows/build.yml"))
-      assert_redirect "/oprypin/nightly.link/workflows/build/%D1%82%D0%B5%D1%81%D1%82"
+      assert_redirect "/oprypin/nightly.link/workflows/build/%D1%82%D0%B5%D1%81%D1%82?preview"
     end
 
     test "private" do
       url = URI.encode_www_form("https://github.com/#{PRIVATE_REPO}/blob/SomeBranch/.github/workflows/SomeWorkflow.yml")
       resp, body = serve("/?url=#{url}&h=6c9bf24563d1896f5de321ce6043413f8c75ef16")
-      assert_redirect "/#{PRIVATE_REPO}/workflows/SomeWorkflow/SomeBranch?h=6c9bf24563d1896f5de321ce6043413f8c75ef16"
+      assert_redirect "/#{PRIVATE_REPO}/workflows/SomeWorkflow/SomeBranch?preview&h=6c9bf24563d1896f5de321ce6043413f8c75ef16"
     end
 
     test "bad url" do
