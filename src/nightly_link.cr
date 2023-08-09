@@ -151,7 +151,7 @@ module GitHubRoutes
 
   @[Retour::Get("/{repo_owner}/{repo_name}/{_kind:blob|tree|raw|blame|commits}/{branch:.+}/.github/workflows/{workflow:[^/]+\\.ya?ml}")]
   def workflow_file(repo_owner, repo_name, _kind, branch, workflow, direct : Bool)
-    NightlyLink.gen_dash_by_branch(repo_owner: repo_owner, repo_name: repo_name, workflow: workflow.rchop(".yml"), branch: branch)
+    NightlyLink.gen_dash_by_branch(repo_owner: repo_owner, repo_name: repo_name, workflow: workflow.rchop(".yml"), branch: branch) + "?preview"
   end
 
   @[Retour::Get("/{repo_owner}/{repo_name}/actions/runs/{run_id:[0-9]+}")]
@@ -316,8 +316,9 @@ class NightlyLink
 
     run = get_latest_run(repo_owner, repo_name, workflow: workflow, branch: branch, status: status, token: token)
     repo_owner, repo_name = run.repository.owner, run.repository.name
+    messages = [] of String
     if run.updated_at < 90.days.ago
-      message = "Warning: the latest successful run is older than 90 days, and its artifacts likely expired."
+      messages << "Warning: the latest successful run is older than 90 days, and its artifacts likely expired."
     end
 
     artifacts = begin
@@ -341,8 +342,16 @@ class NightlyLink
         repo_owner: repo_owner, repo_name: repo_name, workflow: workflow.rchop(".yml"), branch: branch, artifact: art.name
       )), art.name, h: h)
     end
+
     if links.size == 1
-      raise HTTPException.redirect(links[0].url)
+      if ctx.request.query_params["preview"]?
+        messages << (
+          "As long as this workflow produces exactly 1 artifact, you can drop '?preview' from " +
+          "the current URL and this link will redirect to the below page without needing to specify the artifact name."
+        )
+      else
+        raise HTTPException.redirect(links[0].url)
+      end
     end
 
     title = {"Repository #{repo_owner}/#{repo_name}", "Workflow #{workflow} | Branch #{branch}"}
@@ -390,7 +399,7 @@ class NightlyLink
       repo_owner: repo_owner, repo_name: repo_name, run_id: run_id
     ))
     canonical += "?h=#{h}" if h
-    message = nil
+    messages = [] of String
 
     ctx.response.content_type = "text/html"
     ecr_body(ctx.response, title: title.join(" | "), canonical: canonical) do |io|
