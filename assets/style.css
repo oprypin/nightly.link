@@ -1,0 +1,51 @@
+html, body {
+    margin: 0;
+    padding: 0;
+}
+
+body>article {
+    box-sizing: border-box;
+    min-width: 200px;
+    max-width: 980px;
+    margin: 0 auto;
+    padding: 45px;
+}
+
+@media (max-width: 767px) {
+    body>article {
+        padding: 15px;
+    }
+}
+
+body>aside {
+    background-color: #ffff88;
+    background-color: rgba(255, 255, 100, 0.9);
+    color: #24292e;
+}
+body>aside a {
+    color: #0969da;
+    text-decoration: none;
+}
+body>aside>* {
+    box-sizing: border-box;
+    padding: 8px 45px;
+    margin: 0 auto;
+    max-width: 980px;
+}
+
+details {
+    background-color: #f9f9f9;
+    background-color: rgba(160, 160, 160, 0.07);
+    border-left: 2px solid #ccc;
+    border-left-color: rgba(140, 140, 140, 0.4);
+    padding: 5px;
+}
+details summary {
+    font-size: 1.25em;
+    margin: 3px;
+}
+a.example {
+    text-decoration: underline;
+    text-decoration-style: dashed;
+    text-decoration-thickness: 0.5px;
+}

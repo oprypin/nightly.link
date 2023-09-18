@@ -3,9 +3,10 @@ release ?=
 
 md_files = $(wildcard *.md)
 html_files := $(md_files:.md=.html)
-vendored_files := github-markdown.min.css
+vendored_files := style.css
+all_sources := src/nightly_link.cr $(wildcard src/*.cr) $(html_files) $(wildcard templates/*.html) logo.svg $(vendored_files)
 
-nightly_link: src/nightly_link.cr $(wildcard src/*.cr) $(html_files) $(wildcard templates/*.html) $(vendored_files)
+nightly_link: $(all_sources)
 	$(CRYSTAL) build --error-trace $(if $(release),--release )$<
 
 render_md: src/render_md.cr
@@ -14,8 +15,21 @@ render_md: src/render_md.cr
 %.html: %.md render_md
 	./render_md $< > $@
 
-github-markdown.min.css:
-	curl -O https://cdnjs.cloudflare.com/ajax/libs/github-markdown-css/4.0.0/github-markdown.min.css
+style.css: assets/style.css Makefile
+	(cat assets/style.css && \
+	 echo '/* https://github.com/sindresorhus/github-markdown-css */' && \
+	 curl https://cdnjs.cloudflare.com/ajax/libs/github-markdown-css/5.2.0/github-markdown.css | sed -E 's/^ *\.markdown-body \{/body, article {/; s/\.markdown-body/article/' \
+	) >style.css
+
+lib: shard.lock
+	shards install
+
+shard.lock: shard.yml
+	shards update
+
+.PHONY: test
+test: $(all_sources)
+	crystal spec --order=random
 
 .PHONY: clean
 clean:

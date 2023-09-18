@@ -7,26 +7,70 @@
   (optional, other than for private repos; feel free to <a href="https://github.com/settings/apps/authorizations" target="_blank">revoke</a> this anytime)
 </form>
 
-<h2>Get a link to a repository's latest artifact</h2>
-
-<form action="/" method="POST">
-  <label>Insert the GitHub URL of a workflow file that uses <a href="https://github.com/actions/upload-artifact#readme">actions/upload-artifact</a>:<br/>
-  <input name="url" required pattern="<%= HTML.escape(workflow_pattern.source) %>" placeholder="<%= HTML.escape(workflow_placeholder) %>" <% if url %>value="<%= HTML.escape(url.not_nil!) %>"<% end %> style="width: 80%"></label>
-  <input type="submit" value="Get links">
+<h2>Paste a GitHub link, get a nightly.link!</h2>
+<form action="/">
+  <input name="url" id="url" required pattern="^https://github.com<%= HTML.escape(GitHubRoutes._get_regex.source) %>(\?.*)?(#.*)?$" value="<% if url %><%= HTML.escape(url) %><% end %>" style="width: 80%"></label>
+  <input type="submit" id="get" value="Get links">
   <% if h %><input type="hidden" name="h" value="<%= h %>"><% end %>
   <% messages.each do |message| %>
     <p style="color: maroon"><%= HTML.escape(message) %></p>
   <% end %>
 </form>
-<% if example_workflow && example_art && example_dest %>
-<p>Example: <a href="<%= HTML.escape(example_workflow) %>" target="_blank"><%= HTML.escape(example_workflow) %></a></p>
-<p>Following this form (and having selected the "<%= example_art %>" artifact), you will end up at<br><a href="<%= HTML.escape(example_dest) %>" rel="nofollow"><%= HTML.escape(example_dest) %></a> [<a href="<%= HTML.escape(example_dest) %>.zip" rel="nofollow">.zip</a>]<br>
-which is a link that always downloads the latest artifact from a succeeding run on that repo+workflow+branch.</p>
-<p>If you have several workflows or branches, you can adapt the URL by hand in a predictable way.</p>
+<% if messages.empty? %>
+  <p>Check out the following sections to see what you can do with this.</p>
+<% else %>
+  <p>Please check below for recognized link formats:</p>
 <% end %>
 
-<h2>Get a link to a particular artifact</h2>
+<details>
+<summary>Link to a repository's latest artifact</summary>
+<p>Insert the GitHub URL of a workflow file that uses <a target="_blank" href="https://github.com/actions/upload-artifact#readme">actions/upload-artifact</a>.<br/>
+Example: <a class="example" target="_blank" href="<%= HTML.escape(example_workflow) %>"><%= HTML.escape(example_workflow) %></a><br>
+Note that the <i>branch</i> which you're on also matters.</p>
+<p>Following this form (and having selected the "<%= example_art %>" artifact), you will end up at<br><a rel="nofollow" href="<%= example_dest %>"><%= example_dest %></a> [<a rel="nofollow" href="<%= example_dest %>.zip">.zip</a>]<br>
+which is a link that always downloads the latest artifact from a <u>succeeding</u> run on that <u>repo</u>+<u>workflow</u>+<u>branch</u>.</p>
+<p>To allow <u>any completed</u> workflow runs, not only successful ones, append <code>?status=completed</code> to the URL.
+<p>If you have several workflows or branches, you can adapt the URL by hand in a predictable way.</p>
+</details>
 
-<p>If GitHub gave you a link such as <u>https://github.com/UserName/RepoName/suites/1234567890/artifacts/12345678</u>,<br>
-you can just change the prefix to <u><%= HTML.escape(abs_url("/UserName/RepoName/suites/1234567890/artifacts/12345678")) %></u>,<br>
+<details>
+<summary>Link to a particular artifact</summary>
+<p>If GitHub gave you a link such as <a class="example" target="_blank" rel="nofollow" href="<%= HTML.escape("https://github.com" + example_art_link) %>"><%= HTML.escape("https://github.com" + example_art_link) %></a>,<br>
+you can just change the prefix to <a target="_blank" rel="nofollow" href="<%= HTML.escape(abs_url example_art_link) %>"><%= HTML.escape(abs_url example_art_link) %></a>,<br>
 and you get a download URL that works the same but doesn't give a "404" error to users who aren't logged into GitHub.</p>
+<p>Or, paste it into the field above.</p>
+</details>
+
+<details>
+<summary>Extra links for a particular run</summary>
+<p>A <i>run</i> is basically a collection of <i>jobs</i>. Even though it's the job that produces artifacts, they get associated with the parent run.</p>
+<p>Example run: <a class="example" target="_blank" rel="nofollow" href="<%= HTML.escape("https://github.com" + example_run_link) %>"><%= HTML.escape("https://github.com" + example_run_link) %></a>.<br>
+You <i>have to</i> provide the <i>run</i> to <u>nightly.link</u> if you want to find the artifacts.<br>
+Again, you can just change the prefix like <a target="_blank" rel="nofollow" href="<%= HTML.escape(abs_url example_run_link) %>"><%= HTML.escape(abs_url example_run_link) %></a> to get there.<br>
+<p>If, instead, you click into a <i>job</i>, you can access its logs.<br>
+Example job: <a class="example" target="_blank" rel="nofollow" href="https://github.com/oprypin/nightly.link/runs/1849327325?check_suite_focus=true">https://github.com/oprypin/nightly.link/runs/1849327325?check_suite_focus=true</a><br>
+The raw log download link is in the same situation as artifacts: <u>nightly.link</u> is needed to make them work for anonymous users. It accepts both the job's URL itself, and the link that you can get from the "View raw logs" item.</p>
+</details>
+
+<details>
+<summary>Bot that comments on pull requests</summary>
+<p>For projects developing an application, it is useful to quickly try out the executable built from the code of an incoming <a href="https://docs.github.com/en/github/collaborating-with-issues-and-pull-requests/about-pull-requests">pull request</a>. You can do this normally by clicking into a finished GitHub Actions job, then into its parent run, then scrolling down to the list of artifacts.</p>
+<p>Instead, you can opt into a much more convenient approach: add a "bot" that replies with links directly to the artifacts, as soon as the pull request finishes building.</p>
+<p><a href="https://github.com/oprypin/nightly.link/pull/10">Here's how it looks</a>. Apply it to your repository by copying <a href="https://github.com/oprypin/nightly.link/blob/master/.github/workflows/pr-comment.yml">the sample workflow file</a>. Note that it must be added to the main branch and be fully submitted/merged before it will do anything.</p>
+<p>Another advantage that this gives is that users that aren't logged into GitHub can download the artifacts as well. If you don't care about that, you can adapt the sample workflow to link directly to github.com, without relying on this site.</p>
+<p>Note that this ability is not actually part of <u>nightly.link</u>, just a creative way to apply it; the "bot" is executed entirely within GitHub Actions, isolated to your repository.</p>
+</details>
+
+<script>
+  var field = document.getElementById('url');
+  var button = document.getElementById('get');
+  var links = document.getElementsByClassName('example');
+  for (var i = 0; i < links.length; ++i) {
+    links[i].onclick = function() {
+      field.value = this.href;
+      setTimeout(function() { field.focus() }, 1);
+      setTimeout(function() { button.focus() }, 300);
+      return false;
+    }
+  }
+</script>

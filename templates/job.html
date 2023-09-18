@@ -5,17 +5,18 @@
   <% if ext %>
     <p>Pages on GitHub:</p>
   <% else %>
-    <p>You can access this artifact by one of the following links, in the order from least to most direct:</p>
+    <p>View logs for this job:</p>
   <% end %>
   <ul>
     <% links.each_with_index do |link, i| %>
       <% if link.ext == ext %>
         <li>
           <% if !ext && i == 0 %><b><% end %>
-          <a rel="nofollow" href="<%= HTML.escape(link.url) %>"<% if link.ext %> target="_blank"<% end %>><%= HTML.escape(link.title) %></a>
+          <a rel="nofollow" href="<%= HTML.escape(link.url) %>"<% if ext %> target="_blank"<% end %>><%= HTML.escape(link.title) %></a>
           <% if !ext && i == 0 %></b><% end %>
         </li>
       <% end %>
     <% end %>
   </ul>
 <% end %>
+<p>Note that artifacts should instead be accessed through the parent <i>run</i> that triggered this <i>job</i>.</p>

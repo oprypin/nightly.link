@@ -1,14 +1,13 @@
-<title>nightly.link | <%= HTML.escape(title[0]) %> | <%= HTML.escape(title[1]) %></title>
 <h1><a href="/">nightly.link</a></h1>
 <h2><%= HTML.escape(title[0]) %></h2>
 <h3><%= HTML.escape(title[1]) %></h3>
-<% if message %>
+<% messages.each do |message| %>
   <p style="color: maroon"><%= HTML.escape(message.not_nil!) %></p>
 <% end %>
 <p>Choose one of the artifacts:</p>
-<ul>
+<table>
   <% links.each do |link| %>
-    <li><b><a href="<%= HTML.escape(link.url) %>"><%= HTML.escape(link.title) %></a></b>:
-    <a href="<%= HTML.escape(link.url) %>.zip"><%= HTML.escape(link.url) %>.zip</a>
+    <tr><th><a rel="nofollow" href="<%= HTML.escape(link.url) %>"><%= HTML.escape(link.title) %></a></th>
+    <td><a rel="nofollow" href="<%= HTML.escape(link.url ".zip") %>"><%= HTML.escape(link.url ".zip") %></a></td></tr>
   <% end %>
-</ul>
+</table>

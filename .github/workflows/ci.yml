@@ -14,15 +14,17 @@ jobs:
       - name: Install Crystal
         uses: oprypin/install-crystal@v1
       - name: Download source
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
       - name: Cache dependencies
-        uses: actions/cache@v2
+        uses: actions/cache@v3
         with:
           path: lib
           key: ${{ runner.os }}-shards-${{ hashFiles('**/shard.lock') }}
       - name: Install dependencies
-        run: shards check || shards install
+        run: shards check || shards install --ignore-crystal-version
       - name: Build
         run: make -j
+      - name: Run tests
+        run: make -j test
       - name: Check formatting
         run: crystal tool format --check
