@@ -116,7 +116,7 @@ macro get_json_list(t, url, params = NamedTuple.new, max_items = 1000, **kwargs)
   %params = {per_page: %max_items}.merge({{params}})
   %n = 0
   while %url
-    %resp = GitHub.get(%url, params: %params, {{**kwargs}})
+    %resp = GitHub.get(%url, params: %params, {{kwargs.double_splat}})
     %resp.raise_for_status
     %result = {{t}}.from_json(%resp.body).tap { |r| Log.debug { r.to_json } }
     %url = %resp.links.try(&.["next"]?).try(&.target)
