@@ -13,7 +13,7 @@
   <input type="submit" id="get" value="Get links">
   <% if h %><input type="hidden" name="h" value="<%= h %>"><% end %>
   <% messages.each do |message| %>
-    <p style="color: maroon"><%= HTML.escape(message) %></p>
+    <p class="absent"><%= HTML.escape(message) %></p>
   <% end %>
 </form>
 <% if messages.empty? %>

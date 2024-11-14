@@ -2,7 +2,7 @@
 <h2><%= HTML.escape(title[0]) %></h2>
 <h3><%= HTML.escape(title[1]) %></h3>
 <% messages.each do |message| %>
-  <p style="color: maroon"><%= HTML.escape(message.not_nil!) %></p>
+  <p class="absent"><%= HTML.escape(message.not_nil!) %></p>
 <% end %>
 <p>Choose one of the artifacts:</p>
 <table>
