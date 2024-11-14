@@ -107,6 +107,7 @@ end
 
 GitHub = Halite::Client.new do
   endpoint("https://api.github.com/")
+  timeout(10.seconds)
   logging(skip_request_body: true, skip_response_body: true)
 end
 
