@@ -70,7 +70,7 @@ class GitHubAppAuth
     end
   end
 
-  private def new_token(installation_id : InstallationId) : InstallationToken
+  private def new_token(installation_id : InstallationId) : InstallationToken?
     Tasker.in(TOKEN_EXPIRATION * 0.98) do
       if (old_token = @@token.read(installation_id))
         old_token.installation_id = nil # Suppress logging.
@@ -83,6 +83,7 @@ class GitHubAppAuth
       json: {permissions: {actions: "read"}},
       headers: {Authorization: jwt}
     )
+    return nil if resp.status_code == 404
     resp.raise_for_status
     tok = InstallationToken.from_json(resp.body)
     tok.installation_id = installation_id
@@ -91,7 +92,7 @@ class GitHubAppAuth
 
   TOKEN_EXPIRATION = 55.minutes
 
-  def token(installation_id : InstallationId, *, new : Bool = false) : InstallationToken
+  def token(installation_id : InstallationId, *, new : Bool = false) : InstallationToken?
     if new
       @@token.write(installation_id, new_token(installation_id), expires_in: TOKEN_EXPIRATION)
     else
@@ -102,7 +103,7 @@ class GitHubAppAuth
   end
 
   @@jwt = MemoryCache(Int32, AppToken).new
-  @@token = CleanedMemoryCache(InstallationId, InstallationToken).new
+  @@token = CleanedMemoryCache(InstallationId, InstallationToken?).new
 end
 
 GitHub = Halite::Client.new do

@@ -82,7 +82,7 @@ record RepoInstallation,
       {% if tok %}
         args = {installation.id, token}
       {% else %}
-        args = {GitHubApp.token(installation.id)}
+        args = {GitHubApp.token(installation.id).not_nil!}
       {% end %}
       Repositories.for_installation(*args) do |repo|
         if repo.owner == installation.account.login
@@ -121,10 +121,11 @@ record RepoInstallation,
   ) : {InstallationToken, String?}
     if (inst = RepoInstallation.read(db, repo_owner: repo_owner))
       h = inst.verify(repo_name: repo_name, h: h)
-      {GitHubApp.token(inst.installation_id), h}
-    else
-      {GitHubApp.token(FALLBACK_INSTALL_ID), nil}
+      if (tok = GitHubApp.token(inst.installation_id))
+        return {tok, h}
+      end
     end
+    return {GitHubApp.token(FALLBACK_INSTALL_ID).not_nil!, nil}
   end
 end
 
@@ -233,7 +234,7 @@ class NightlyLink
     example_dest = abs_url(NightlyLink.gen_by_branch(**args))
 
     run, artifact = @@examples_cache.fetch(example_workflow) do
-      token = GitHubApp.token(FALLBACK_INSTALL_ID)
+      token = GitHubApp.token(FALLBACK_INSTALL_ID).not_nil!
       run_ = get_latest_run(
         args[:repo_owner], args[:repo_name],
         workflow: args[:workflow] + ".yml", branch: args[:branch], status: "success", token: token
