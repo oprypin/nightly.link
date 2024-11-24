@@ -671,7 +671,7 @@ class NightlyLink
   rescue exception
     if !exception.is_a?(HTTPException)
       raise exception if reraise
-      Log.error(exception: exception) { }
+      Log.error(exception: exception) { "" }
       exception = HTTPException.new(:InternalServerError)
     end
     ctx.response.content_type = "text/html"
@@ -722,6 +722,7 @@ class ForwarderHandler
 end
 
 if (port = PORT)
+  STDERR.flush_on_newline = true
   app = NightlyLink.new
   server = HTTP::Server.new([
     ForwarderHandler.new,
