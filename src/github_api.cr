@@ -264,7 +264,7 @@ end
 
 struct Artifacts
   include JSON::Serializable
-  property artifacts : Array(Artifact)
+  property artifacts : Array(Artifact) = [] of Artifact
 
   cached_array def self.for_run(
     repo_owner : DowncaseString, repo_name : DowncaseString, run_id : Int64,
