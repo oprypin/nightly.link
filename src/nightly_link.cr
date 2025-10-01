@@ -117,7 +117,7 @@ record RepoInstallation,
   end
 
   def self.verified_token(
-    db : DB::Database, repo_owner : String, repo_name : String, *, h : String?
+    db : DB::Database, repo_owner : String, repo_name : String, *, h : String?,
   ) : {InstallationToken, String?}
     if (inst = RepoInstallation.read(db, repo_owner: repo_owner))
       h = inst.verify(repo_name: repo_name, h: h)
@@ -139,7 +139,7 @@ end
 
 private def github_actions_link(
   repo_owner : String, repo_name : String, *,
-  event : String, branch : String, status : String
+  event : String, branch : String, status : String,
 ) : String
   "https://github.com/#{repo_owner}/#{repo_name}/actions?" + HTTP::Params.encode({
     query: "event:#{event} is:#{status} branch:#{branch}",
@@ -412,7 +412,7 @@ class NightlyLink
 
   private def get_latest_run(
     repo_owner : String, repo_name : String,
-    workflow : String, branch : String, status : String, token : InstallationToken
+    workflow : String, branch : String, status : String, token : InstallationToken,
   )
     futures = [{"push", 5.minutes}, {"schedule", 1.hour}].map do |(event, expires_in)|
       future do
@@ -461,7 +461,7 @@ class NightlyLink
   @[Retour::Get("/{repo_owner}/{repo_name}/workflows/{workflow}/{branch}/{artifact}")]
   def by_branch(
     ctx, repo_owner : String, repo_name : String, workflow : String, branch : String, artifact : String,
-    h : String? = nil, zip : String? = nil
+    h : String? = nil, zip : String? = nil,
   )
     h = ctx.request.query_params["h"]? if ctx
     token, h = RepoInstallation.verified_token(@db, repo_owner, repo_name, h: h)
@@ -500,7 +500,7 @@ class NightlyLink
   @[Retour::Get("/{repo_owner}/{repo_name}/actions/runs/{run_id:[0-9]+}/{artifact}")]
   def by_run(
     ctx, repo_owner : String, repo_name : String, run_id : Int64 | String, artifact : String, check_suite_id : Int64? | String = nil,
-    h : String? = nil, zip : String? = nil
+    h : String? = nil, zip : String? = nil,
   )
     run_id = run_id.to_i64 rescue raise HTTPException.new(:NotFound)
     check_suite_id = check_suite_id && check_suite_id.to_i64 rescue raise HTTPException.new(:NotFound)
@@ -546,7 +546,7 @@ class NightlyLink
   @[Retour::Get("/{repo_owner}/{repo_name}/actions/artifacts/{artifact_id:[0-9]+}")]
   def by_artifact(
     ctx, repo_owner : String, repo_name : String, artifact_id : String | Int64, check_suite_id : String | Int64? = nil,
-    h : String? = nil, zip : String? = nil
+    h : String? = nil, zip : String? = nil,
   )
     artifact_id = artifact_id.to_i64 rescue raise HTTPException.new(:NotFound)
     if check_suite_id
@@ -602,7 +602,7 @@ class NightlyLink
   @[Retour::Get("/{repo_owner}/{repo_name}/runs/{job_id:[0-9]+}")]
   def by_job(
     ctx, repo_owner : String, repo_name : String, job_id : String | Int64,
-    h : String? = nil, txt : String? = nil
+    h : String? = nil, txt : String? = nil,
   )
     job_id = job_id.to_i64 rescue raise HTTPException.new(:NotFound)
     h = ctx.request.query_params["h"]? if ctx
@@ -703,7 +703,7 @@ class HTTPException < Exception
   end
 end
 
-def if_not_found(e : Halite::Exception::ClientError)
+def if_not_found(e : Halite::Exception::ClientError, &)
   if e.status_code.in?(401, 404, 451)
     yield
   else

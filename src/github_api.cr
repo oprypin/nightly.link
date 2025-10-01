@@ -299,7 +299,7 @@ struct Artifact
   @@cache_zip_by_id = CleanedMemoryCache({String, String, Int64}, String).new
 
   def self.zip_by_id(
-    repo_owner : String, repo_name : String, artifact_id : Int64, token : InstallationToken | UserToken
+    repo_owner : String, repo_name : String, artifact_id : Int64, token : InstallationToken | UserToken,
   ) : String
     repo_owner = repo_owner.downcase
     repo_name = repo_name.downcase
@@ -324,7 +324,7 @@ struct Logs
   @@cache_raw_by_id = CleanedMemoryCache({String, String, Int64}, String).new
 
   def self.raw_by_id(
-    repo_owner : String, repo_name : String, job_id : Int64, token : InstallationToken | UserToken
+    repo_owner : String, repo_name : String, job_id : Int64, token : InstallationToken | UserToken,
   ) : String
     repo_owner = repo_owner.downcase
     repo_name = repo_name.downcase
