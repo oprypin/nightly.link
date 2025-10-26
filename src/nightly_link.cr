@@ -338,7 +338,7 @@ class NightlyLink
       )
     end
 
-    links = artifacts.map do |art|
+    links = artifacts.sort_by(&.name).map do |art|
       repo_owner = art.repository.owner
       repo_name = art.repository.name
       ArtifactLink.new(abs_url(NightlyLink.gen_by_branch(
@@ -390,7 +390,7 @@ class NightlyLink
       )
     end
 
-    links = artifacts.map do |art|
+    links = artifacts.sort_by(&.name).map do |art|
       repo_owner = art.repository.owner
       repo_name = art.repository.name
       ArtifactLink.new(abs_url(NightlyLink.gen_by_run(
