@@ -512,7 +512,7 @@ RepoInstallation.new(
   private_repos: DelimitedString.new("#{PRIVATE_REPO.partition("/").last}\n")
 ).write(D)
 
-def serve(method : String, path : String)
+def serve(method : String, path : String, &)
   io = IO::Memory.new
   yield request = HTTP::Request.new(method, path)
   response = HTTP::Server::Response.new(io)
