@@ -14,4 +14,3 @@ jobs:
         with:
           name: some-artifact
           path: art.txt
-
