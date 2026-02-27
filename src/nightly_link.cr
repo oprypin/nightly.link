@@ -574,6 +574,12 @@ class NightlyLink
         )
       end
     end
+    if !tmp_link.partition("?")[0].ends_with?(".zip")
+      raise HTTPException.new(:NotFound,
+        "Sorry, only *.zip downloads are supported by nightly.link for the moment.\n" +
+        "See <https://github.com/oprypin/nightly.link/issues/88>"
+      )
+    end
     if zip
       raise HTTPException.redirect(tmp_link)
     end

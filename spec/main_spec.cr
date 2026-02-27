@@ -12,11 +12,16 @@ CHECK_SUITE_1  =  1987654321
 RUN_1          =   987654321
 RUN_2          =   987654324
 RUN_3          =   987654326
+RUN_4          =   987654327
 JOB_1          =  9977553311
 JOB_2          =  9977553317
 ARTIFACT_1     =    87654321
 ARTIFACT_2     =    87654325
+ARTIFACT_4     =    87654327
 PRIVATE_REPO   = "oprypin/test-private-repo"
+DOWNLOAD_1     = "https://productionresultssa5.example.net/actions-results/a1a1a1a1-a1a1-a1a1-a1a1-a1a1a1a1a1a1/workflow-job-run-a1a1a1a1-a1a1-1111-1111-a1a1a1a1a1a1/artifacts/a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1.zip?rscd=attachment%3B+filename%3D%22foo.zip%22&rsct=application%2Fzip&se=2026-02-27T10%3A55%3A00Z&sig=aAaAaAaAaAaAaaaaaAaAaAaAaAaA%2Frb%2FaAaAaAaAaAa%3D&ske=2026-02-27T13%3A37%3A56Z&skoid=a1a1a1a1-a1a1-a1a1-a1a1-a1a1a1a1a1a1&sks=b&skt=2026-02-27T09%3A37%3A56Z&sktid=b1b1b1b1-b1b1-b1b1-b1b1-b1b1b1b1b1b1&skv=2025-11-05&sp=r&spr=https&sr=b&st=2026-02-27T10%3A44%3A55Z&sv=2025-11-05"
+DOWNLOAD_2     = DOWNLOAD_1.gsub("a1", "a2")
+DOWNLOAD_BAD   = DOWNLOAD_1.gsub(".zip", "")
 
 require "http"
 require "spec_assert"
@@ -305,7 +310,7 @@ describe "by_branch" do
                 {"id":#{ARTIFACT_1},"name":"Some#Artifact","url":"https://api.github.com/repos/UserName/RepoName/actions/artifacts/#{ARTIFACT_1}"},
                 {"id":#{ARTIFACT_2},"name":"AnotherArtifact","url":"https://api.github.com/repos/UserName/RepoName/actions/artifacts/#{ARTIFACT_2}"}]}))
     WebMock.stub(:get, "https://api.github.com/repos/username/reponame/actions/artifacts/#{ARTIFACT_1}/zip").to_return(
-      headers: HTTP::Headers{"location" => "http://example.org/download1"})
+      headers: HTTP::Headers{"location" => DOWNLOAD_1})
   end
 
   test do
@@ -318,7 +323,7 @@ describe "by_branch" do
       "https://nightly.link/UserName/RepoName/actions/runs/#{RUN_2}/Some%23Artifact.zip",
       "https://nightly.link/UserName/RepoName/actions/artifacts/#{ARTIFACT_1}.zip",
     ].flat_map { |s| [s, s] } + [
-      "http://example.org/download1",
+      HTML.escape(DOWNLOAD_1),
       "https://github.com/UserName/RepoName/actions?query=event%3Aschedule+is%3Asuccess+branch%3ASomeBranch",
       "https://github.com/UserName/RepoName/actions/runs/#{RUN_2}#artifacts",
       "https://github.com/UserName/RepoName/suites/#{CHECK_SUITE_1}/artifacts/#{ARTIFACT_1}",
@@ -340,7 +345,7 @@ describe "by_branch" do
 
   test "redirect" do
     resp, body = serve("/UserName/RepoName/workflows/SomeWorkflow/SomeBranch/Some%23Artifact.zip")
-    assert_redirect "http://example.org/download1"
+    assert_redirect DOWNLOAD_1
   end
 
   describe "private" do
@@ -374,7 +379,7 @@ describe "by_branch" do
                   {"id":#{ARTIFACT_1},"name":"Some#Artifact","url":"https://api.github.com/repos/#{PRIVATE_REPO}/actions/artifacts/#{ARTIFACT_1}"},
                   {"id":#{ARTIFACT_2},"name":"AnotherArtifact","url":"https://api.github.com/repos/#{PRIVATE_REPO}/actions/artifacts/#{ARTIFACT_2}"}]}))
       WebMock.stub(:get, "https://api.github.com/repos/#{PRIVATE_REPO}/actions/artifacts/#{ARTIFACT_1}/zip").to_return(
-        headers: HTTP::Headers{"location" => "http://example.org/download2"})
+        headers: HTTP::Headers{"location" => DOWNLOAD_2})
 
       resp, body = serve("/#{PRIVATE_REPO}/workflows/SomeWorkflow/SomeBranch/Some%23Artifact?h=6c9bf24563d1896f5de321ce6043413f8c75ef16")
       assert_canonical "https://nightly.link/#{PRIVATE_REPO}/workflows/SomeWorkflow/SomeBranch/Some%23Artifact?h=6c9bf24563d1896f5de321ce6043413f8c75ef16"
@@ -383,7 +388,7 @@ describe "by_branch" do
         "https://nightly.link/#{PRIVATE_REPO}/actions/runs/#{RUN_2}/Some%23Artifact.zip?h=6c9bf24563d1896f5de321ce6043413f8c75ef16",
         "https://nightly.link/#{PRIVATE_REPO}/actions/artifacts/#{ARTIFACT_1}.zip?h=6c9bf24563d1896f5de321ce6043413f8c75ef16",
       ].flat_map { |s| [s, s] } + [
-        "http://example.org/download2",
+        HTML.escape(DOWNLOAD_2),
         "https://github.com/#{PRIVATE_REPO}/actions?query=event%3Aschedule+is%3Asuccess+branch%3ASomeBranch",
         "https://github.com/#{PRIVATE_REPO}/actions/runs/#{RUN_2}#artifacts",
         "https://github.com/#{PRIVATE_REPO}/suites/#{CHECK_SUITE_1}/artifacts/#{ARTIFACT_1}",
@@ -398,7 +403,7 @@ describe "by_run" do
     WebMock.stub(:get, "https://api.github.com/repos/username/reponame/actions/runs/#{RUN_1}/artifacts?per_page=100").to_return(
       body: %({"artifacts":[{"id":#{ARTIFACT_1},"name":"Some#Artifact","url":"https://api.github.com/repos/UserName/RepoName/actions/artifacts/#{ARTIFACT_1}"}]}))
     WebMock.stub(:get, "https://api.github.com/repos/username/reponame/actions/artifacts/#{ARTIFACT_1}/zip").to_return(
-      headers: HTTP::Headers{"location" => "http://example.org/download1"})
+      headers: HTTP::Headers{"location" => DOWNLOAD_1})
   end
 
   test do
@@ -410,7 +415,7 @@ describe "by_run" do
       "https://nightly.link/UserName/RepoName/actions/runs/#{RUN_1}/Some%23Artifact.zip",
       "https://nightly.link/UserName/RepoName/actions/artifacts/#{ARTIFACT_1}.zip",
     ].flat_map { |s| [s, s] } + [
-      "http://example.org/download1",
+      HTML.escape(DOWNLOAD_1),
       "https://github.com/UserName/RepoName/actions/runs/#{RUN_1}#artifacts",
     ]
     assert_nofollow
@@ -418,14 +423,34 @@ describe "by_run" do
 
   test "redirect" do
     resp, body = serve("/UserName/RepoName/actions/runs/#{RUN_1}/Some%23Artifact.zip")
-    assert_redirect "http://example.org/download1"
+    assert_redirect DOWNLOAD_1
+  end
+
+  describe "non-zip download" do
+    before_each do
+      WebMock.stub(:get, "https://api.github.com/repos/username/reponame/actions/runs/#{RUN_4}/artifacts?per_page=100").to_return(
+        body: %({"artifacts":[{"id":#{ARTIFACT_4},"name":"SomeArtifactE.exe","url":"https://api.github.com/repos/UserName/RepoName/actions/artifacts/#{ARTIFACT_4}"}]}))
+      WebMock.stub(:get, "https://api.github.com/repos/username/reponame/actions/artifacts/#{ARTIFACT_4}/zip").to_return(
+        headers: HTTP::Headers{"location" => DOWNLOAD_BAD})
+    end
+
+    {"", ".zip"}.each do |kind|
+      test kind do
+        resp, body = serve("/UserName/RepoName/actions/runs/#{RUN_4}/SomeArtifactE.exe#{kind}")
+        assert resp.status == HTTP::Status::NOT_FOUND
+        assert_contents [
+          "Sorry",
+        ]
+        assert_nofollow
+      end
+    end
   end
 end
 
 describe "by_artifact" do
   before_each do
     WebMock.stub(:get, "https://api.github.com/repos/username/reponame/actions/artifacts/#{ARTIFACT_1}/zip").to_return(
-      headers: HTTP::Headers{"location" => "http://example.org/download1"})
+      headers: HTTP::Headers{"location" => DOWNLOAD_1})
   end
 
   test do
@@ -433,14 +458,14 @@ describe "by_artifact" do
     assert_canonical "https://nightly.link/UserName/RepoName/actions/artifacts/#{ARTIFACT_1}"
     assert_contents [
       "https://nightly.link/UserName/RepoName/actions/artifacts/#{ARTIFACT_1}.zip",
-      "http://example.org/download1",
+      HTML.escape(DOWNLOAD_1),
     ]
     assert_nofollow
   end
 
   test "redirect" do
     resp, body = serve("/UserName/RepoName/actions/artifacts/#{ARTIFACT_1}.zip")
-    assert_redirect "http://example.org/download1"
+    assert_redirect DOWNLOAD_1
   end
 
   test "no double zip" do
@@ -455,7 +480,7 @@ end
 describe "by_job" do
   before_each do
     WebMock.stub(:get, "https://api.github.com/repos/username/reponame/actions/jobs/#{JOB_1}/logs").to_return(
-      headers: HTTP::Headers{"location" => "http://example.org/download1"})
+      headers: HTTP::Headers{"location" => DOWNLOAD_1})
   end
 
   test do
@@ -465,7 +490,7 @@ describe "by_job" do
       "Repository uSerName/RepoName", "Job ##{JOB_1}",
       "Repository uSerName/RepoName", "Job ##{JOB_1}",
       "https://nightly.link/uSerName/RepoName/runs/#{JOB_1}.txt",
-      "http://example.org/download1",
+      HTML.escape(DOWNLOAD_1),
       "https://github.com/uSerName/RepoName/runs/#{JOB_1}",
     ]
     assert_nofollow
@@ -473,7 +498,7 @@ describe "by_job" do
 
   test "txt" do
     resp, body = serve("/UserName/RepoName/runs/#{JOB_1}.txt")
-    assert_redirect "http://example.org/download1"
+    assert_redirect DOWNLOAD_1
   end
 
   describe "expired" do
