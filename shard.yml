@@ -18,6 +18,7 @@ dependencies:
     github: crystal-community/jwt
   halite:
     github: icyleaf/halite
+    version: '<0.12.1'
   memory_cache:
     github: kostya/memory_cache
   tasker:

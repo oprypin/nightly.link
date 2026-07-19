@@ -22,7 +22,7 @@ shards:
 
   halite:
     git: https://github.com/icyleaf/halite.git
-    version: 0.12.1
+    version: 0.12.0
 
   jwt:
     git: https://github.com/crystal-community/jwt.git
