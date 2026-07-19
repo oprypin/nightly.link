@@ -357,7 +357,7 @@ class NightlyLink
       end
     end
 
-    title = {"Repository #{repo_owner}/#{repo_name}", "Workflow #{workflow} | Branch #{branch}"}
+    title = {"Repository #{repo_owner}/#{repo_name}", "Workflow #{workflow} | Branch #{branch} | Commit #{run.head_sha} | Timestamp #{run.updated_at}"}
     canonical = abs_url(NightlyLink.gen_dash_by_branch(
       repo_owner: repo_owner, repo_name: repo_name, workflow: workflow.rchop(".yml"), branch: branch
     ))
