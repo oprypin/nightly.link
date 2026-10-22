@@ -1,9 +1,7 @@
 name: Test workflow with upload
 on:
   push:
-    paths: ['.github/workflows/upload-test.yml']
   pull_request:
-    paths: ['.github/workflows/upload-test.yml']
 jobs:
   build:
     runs-on: ubuntu-latest
