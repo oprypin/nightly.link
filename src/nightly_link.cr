@@ -203,9 +203,6 @@ class NightlyLink
     "https://github.com/crystal-lang/crystal/blob/master/.github/workflows/win.yml" => {
       repo_owner: "crystal-lang", repo_name: "crystal", workflow: "win", branch: "master", artifact: "crystal",
     },
-    "https://github.com/quassel/quassel/blob/master/.github/workflows/main.yml" => {
-      repo_owner: "quassel", repo_name: "quassel", workflow: "main", branch: "master", artifact: "Windows",
-    },
   }.to_a
   @@examples_cache = MemoryCache(String, {WorkflowRun, Artifact}).new
 
