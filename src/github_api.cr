@@ -320,6 +320,47 @@ struct Artifact
   end
 end
 
+# Ephemeral download link of an artifact, along with the details that GitHub encodes into it.
+#
+# The API doesn't tell whether an artifact was zipped on upload, but the link that it redirects to
+# does.  It points to Azure Blob Storage, and its `rsct` and `rscd` parameters set the Content-Type
+# and Content-Disposition headers of the download.  This is also what actions/download-artifact
+# relies on to decide whether to unzip a download.
+struct ArtifactDownload
+  ZIP_CONTENT_TYPES = {"application/zip", "application/x-zip-compressed", "application/zip-compressed"}
+
+  getter url : String
+
+  def initialize(@url : String)
+    @uri = URI.parse(url)
+  end
+
+  def content_type : String?
+    @uri.query_params["rsct"]?
+  end
+
+  def content_disposition : String?
+    @uri.query_params["rscd"]?
+  end
+
+  # Name under which browsers save the file
+  def filename : String?
+    content_disposition.try do |disposition|
+      disposition[/\bfilename\*=UTF-8''([^;]+)/i, 1]?.try { |name| URI.decode(name) } ||
+        disposition[/\bfilename="([^"]*)"/, 1]?
+    end
+  end
+
+  def zip? : Bool
+    @uri.path.ends_with?(".zip") || content_type.in?(ZIP_CONTENT_TYPES)
+  end
+
+  # Whether browsers save the file rather than display it
+  def attachment? : Bool
+    !!content_disposition.try(&.starts_with?("attachment"))
+  end
+end
+
 struct Logs
   @@cache_raw_by_id = CleanedMemoryCache({String, String, Int64}, String).new
 

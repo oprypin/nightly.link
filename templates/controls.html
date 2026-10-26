@@ -31,6 +31,7 @@ Note that the <i>branch</i> which you're on also matters.</p>
 which is a link that always downloads the latest artifact from a <u>succeeding</u> run on that <u>repo</u>+<u>workflow</u>+<u>branch</u>.</p>
 <p>To allow <u>any completed</u> workflow runs, not only successful ones, append <code>?status=completed</code> to the URL.
 <p>If you have several workflows or branches, you can adapt the URL by hand in a predictable way.</p>
+<p>Artifacts uploaded with <code>archive: false</code> are supported if they are archives such as <code>.tar.gz</code> or <code>.7z</code>. These don't get the <code>.zip</code> suffix: the link that ends with the file name downloads it directly, and adding <code>?preview</code> to it shows all the links instead.</p>
 </details>
 
 <details>

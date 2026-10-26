@@ -13,15 +13,21 @@ RUN_1          =   987654321
 RUN_2          =   987654324
 RUN_3          =   987654326
 RUN_4          =   987654327
+RUN_5          =   987654329
 JOB_1          =  9977553311
 JOB_2          =  9977553317
 ARTIFACT_1     =    87654321
 ARTIFACT_2     =    87654325
 ARTIFACT_4     =    87654327
+ARTIFACT_5     =    87654329
+ARTIFACT_6     =    87654331
 PRIVATE_REPO   = "oprypin/test-private-repo"
 DOWNLOAD_1     = "https://productionresultssa5.example.net/actions-results/a1a1a1a1-a1a1-a1a1-a1a1-a1a1a1a1a1a1/workflow-job-run-a1a1a1a1-a1a1-1111-1111-a1a1a1a1a1a1/artifacts/a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1.zip?rscd=attachment%3B+filename%3D%22foo.zip%22&rsct=application%2Fzip&se=2026-02-27T10%3A55%3A00Z&sig=aAaAaAaAaAaAaaaaaAaAaAaAaAaA%2Frb%2FaAaAaAaAaAa%3D&ske=2026-02-27T13%3A37%3A56Z&skoid=a1a1a1a1-a1a1-a1a1-a1a1-a1a1a1a1a1a1&sks=b&skt=2026-02-27T09%3A37%3A56Z&sktid=b1b1b1b1-b1b1-b1b1-b1b1-b1b1b1b1b1b1&skv=2025-11-05&sp=r&spr=https&sr=b&st=2026-02-27T10%3A44%3A55Z&sv=2025-11-05"
 DOWNLOAD_2     = DOWNLOAD_1.gsub("a1", "a2")
-DOWNLOAD_BAD   = DOWNLOAD_1.gsub(".zip", "")
+# Artifacts uploaded with `archive: false`, as GitHub serves them
+DOWNLOAD_EXE  = DOWNLOAD_1.sub(".zip?", "?").sub("foo.zip", "SomeArtifactE.exe").sub("application%2Fzip", "application%2Foctet-stream")
+DOWNLOAD_TGZ  = DOWNLOAD_1.sub(".zip?", ".gz?").sub("foo.zip", "SomeArtifactT.tar.gz").sub("application%2Fzip", "application%2Fgzip")
+DOWNLOAD_HTML = DOWNLOAD_1.sub(".zip?", ".html?").sub("attachment", "inline").sub("foo.zip", "SomeArtifactH.html").sub("application%2Fzip", "text%2Fhtml")
 
 require "http"
 require "spec_assert"
@@ -348,6 +354,52 @@ describe "by_branch" do
     assert_redirect DOWNLOAD_1
   end
 
+  describe "unzipped archive" do
+    before_each do
+      WebMock.stub(:get, "https://api.github.com/repos/username/reponame/actions/workflows/SomeWorkflow.yml/runs?per_page=1&branch=ArchiveBranch&event=push&status=success").to_return(
+        body: %({"workflow_runs":[
+                  {"id":#{RUN_5},"event":"push","workflow_id":#{WORKFLOW_1},"check_suite_url":"https://api.github.com/repos/UserName/RepoName/check-suites/#{CHECK_SUITE_1}","updated_at":"2021-02-07T07:15:00Z","repository":{"full_name":"UserName/RepoName","private":false,"fork":false}}]}))
+      WebMock.stub(:get, "https://api.github.com/repos/username/reponame/actions/workflows/SomeWorkflow.yml/runs?per_page=1&branch=ArchiveBranch&event=schedule&status=success").to_return(
+        body: %({"workflow_runs":[]}))
+      WebMock.stub(:get, "https://api.github.com/repos/username/reponame/actions/runs/#{RUN_5}/artifacts?per_page=100").to_return(
+        body: %({"artifacts":[{"id":#{ARTIFACT_5},"name":"SomeArtifactT.tar.gz","url":"https://api.github.com/repos/UserName/RepoName/actions/artifacts/#{ARTIFACT_5}"}]}))
+      WebMock.stub(:get, "https://api.github.com/repos/username/reponame/actions/artifacts/#{ARTIFACT_5}/zip").to_return(
+        headers: HTTP::Headers{"location" => DOWNLOAD_TGZ})
+    end
+
+    test "redirect" do
+      resp, body = serve("/UserName/RepoName/workflows/SomeWorkflow/ArchiveBranch/SomeArtifactT.tar.gz")
+      assert_redirect DOWNLOAD_TGZ
+    end
+
+    test "preview" do
+      resp, body = serve("/UserName/RepoName/workflows/SomeWorkflow/ArchiveBranch/SomeArtifactT.tar.gz?preview")
+      assert_canonical "https://nightly.link/UserName/RepoName/workflows/SomeWorkflow/ArchiveBranch/SomeArtifactT.tar.gz?preview"
+      assert_contents [
+        "Repository UserName/RepoName", "Workflow SomeWorkflow.yml | Branch ArchiveBranch | Artifact SomeArtifactT.tar.gz",
+      ] * 2 + [
+        "https://nightly.link/UserName/RepoName/workflows/SomeWorkflow/ArchiveBranch/SomeArtifactT.tar.gz<",
+        "https://nightly.link/UserName/RepoName/actions/runs/#{RUN_5}/SomeArtifactT.tar.gz<",
+        "https://nightly.link/UserName/RepoName/actions/artifacts/#{ARTIFACT_5}/SomeArtifactT.tar.gz<",
+        HTML.escape(DOWNLOAD_TGZ),
+        "https://github.com/UserName/RepoName/actions?query=event%3Apush+is%3Asuccess+branch%3AArchiveBranch",
+        "https://github.com/UserName/RepoName/actions/runs/#{RUN_5}#artifacts",
+        "https://github.com/UserName/RepoName/suites/#{CHECK_SUITE_1}/artifacts/#{ARTIFACT_5}",
+      ]
+      assert !body.includes?("SomeArtifactT.tar.gz.zip")
+      assert_nofollow
+    end
+
+    test "zip" do
+      resp, body = serve("/UserName/RepoName/workflows/SomeWorkflow/ArchiveBranch/SomeArtifactT.tar.gz.zip")
+      assert resp.status == HTTP::Status::NOT_FOUND
+      assert_contents [
+        "is not a zip archive but a file &#39;SomeArtifactT.tar.gz&#39;", "Remove &#39;.zip&#39;",
+      ]
+      assert_nofollow
+    end
+  end
+
   describe "private" do
     test "without password" do
       resp, body = serve("/#{PRIVATE_REPO}/workflows/SomeWorkflow/SomeBranch/Some%23Artifact.zip")
@@ -426,23 +478,79 @@ describe "by_run" do
     assert_redirect DOWNLOAD_1
   end
 
-  describe "non-zip download" do
+  describe "unsupported non-zip download" do
     before_each do
       WebMock.stub(:get, "https://api.github.com/repos/username/reponame/actions/runs/#{RUN_4}/artifacts?per_page=100").to_return(
-        body: %({"artifacts":[{"id":#{ARTIFACT_4},"name":"SomeArtifactE.exe","url":"https://api.github.com/repos/UserName/RepoName/actions/artifacts/#{ARTIFACT_4}"}]}))
+        body: %({"artifacts":[
+                  {"id":#{ARTIFACT_4},"name":"SomeArtifactE.exe","url":"https://api.github.com/repos/UserName/RepoName/actions/artifacts/#{ARTIFACT_4}"},
+                  {"id":#{ARTIFACT_6},"name":"SomeArtifactH.html","url":"https://api.github.com/repos/UserName/RepoName/actions/artifacts/#{ARTIFACT_6}"}]}))
       WebMock.stub(:get, "https://api.github.com/repos/username/reponame/actions/artifacts/#{ARTIFACT_4}/zip").to_return(
-        headers: HTTP::Headers{"location" => DOWNLOAD_BAD})
+        headers: HTTP::Headers{"location" => DOWNLOAD_EXE})
+      WebMock.stub(:get, "https://api.github.com/repos/username/reponame/actions/artifacts/#{ARTIFACT_6}/zip").to_return(
+        headers: HTTP::Headers{"location" => DOWNLOAD_HTML})
     end
 
-    {"", ".zip"}.each do |kind|
-      test kind do
-        resp, body = serve("/UserName/RepoName/actions/runs/#{RUN_4}/SomeArtifactE.exe#{kind}")
-        assert resp.status == HTTP::Status::NOT_FOUND
-        assert_contents [
-          "Sorry",
-        ]
-        assert_nofollow
+    {"SomeArtifactE.exe", "SomeArtifactH.html"}.each do |name|
+      {"", ".zip", "?preview"}.each do |kind|
+        test "#{name}#{kind}" do
+          resp, body = serve("/UserName/RepoName/actions/runs/#{RUN_4}/#{name}#{kind}")
+          assert resp.status == HTTP::Status::NOT_FOUND
+          assert_contents [
+            "Sorry",
+          ]
+          assert_nofollow
+        end
       end
+    end
+  end
+
+  describe "unzipped archive" do
+    before_each do
+      {"UserName/RepoName", PRIVATE_REPO}.each do |repo|
+        WebMock.stub(:get, "https://api.github.com/repos/#{repo.downcase}/actions/runs/#{RUN_5}/artifacts?per_page=100").to_return(
+          body: %({"artifacts":[{"id":#{ARTIFACT_5},"name":"SomeArtifactT.tar.gz","url":"https://api.github.com/repos/#{repo}/actions/artifacts/#{ARTIFACT_5}"}]}))
+        WebMock.stub(:get, "https://api.github.com/repos/#{repo.downcase}/actions/artifacts/#{ARTIFACT_5}/zip").to_return(
+          headers: HTTP::Headers{"location" => DOWNLOAD_TGZ})
+      end
+    end
+
+    test "redirect" do
+      resp, body = serve("/UserName/RepoName/actions/runs/#{RUN_5}/SomeArtifactT.tar.gz")
+      assert_redirect DOWNLOAD_TGZ
+    end
+
+    test "preview" do
+      resp, body = serve("/UserName/RepoName/actions/runs/#{RUN_5}/SomeArtifactT.tar.gz?preview")
+      assert_canonical "https://nightly.link/UserName/RepoName/actions/runs/#{RUN_5}/SomeArtifactT.tar.gz?preview"
+      assert_contents [
+        "https://nightly.link/UserName/RepoName/actions/runs/#{RUN_5}/SomeArtifactT.tar.gz<",
+        "https://nightly.link/UserName/RepoName/actions/artifacts/#{ARTIFACT_5}/SomeArtifactT.tar.gz<",
+        HTML.escape(DOWNLOAD_TGZ),
+        "https://github.com/UserName/RepoName/actions/runs/#{RUN_5}#artifacts",
+      ]
+      assert !body.includes?("SomeArtifactT.tar.gz.zip")
+      assert_nofollow
+    end
+
+    test "zip" do
+      resp, body = serve("/UserName/RepoName/actions/runs/#{RUN_5}/SomeArtifactT.tar.gz.zip")
+      assert resp.status == HTTP::Status::NOT_FOUND
+      assert_contents [
+        "is not a zip archive", "Remove &#39;.zip&#39;",
+      ]
+    end
+
+    test "private" do
+      resp, body = serve("/#{PRIVATE_REPO}/actions/runs/#{RUN_5}/SomeArtifactT.tar.gz?h=6c9bf24563d1896f5de321ce6043413f8c75ef16")
+      assert_redirect DOWNLOAD_TGZ
+
+      resp, body = serve("/#{PRIVATE_REPO}/actions/runs/#{RUN_5}/SomeArtifactT.tar.gz?preview&h=6c9bf24563d1896f5de321ce6043413f8c75ef16")
+      assert_canonical "https://nightly.link/#{PRIVATE_REPO}/actions/runs/#{RUN_5}/SomeArtifactT.tar.gz?preview&h=6c9bf24563d1896f5de321ce6043413f8c75ef16"
+      assert_contents [
+        "https://nightly.link/#{PRIVATE_REPO}/actions/runs/#{RUN_5}/SomeArtifactT.tar.gz?h=6c9bf24563d1896f5de321ce6043413f8c75ef16<",
+        "https://nightly.link/#{PRIVATE_REPO}/actions/artifacts/#{ARTIFACT_5}/SomeArtifactT.tar.gz?h=6c9bf24563d1896f5de321ce6043413f8c75ef16<",
+      ]
+      assert_nofollow
     end
   end
 end
@@ -474,6 +582,95 @@ describe "by_artifact" do
 
     resp, body = serve("/UserName/RepoName/actions/artifacts/#{ARTIFACT_1}.zip.zip")
     assert resp.status == HTTP::Status::NOT_FOUND
+  end
+
+  test "file" do
+    resp, body = serve("/UserName/RepoName/actions/artifacts/#{ARTIFACT_1}/foo.zip")
+    assert_redirect DOWNLOAD_1
+
+    resp, body = serve("/UserName/RepoName/actions/artifacts/#{ARTIFACT_1}/foo")
+    assert resp.status == HTTP::Status::NOT_FOUND
+    assert_contents [
+      "has no file &#39;foo&#39;", "https://nightly.link/UserName/RepoName/actions/artifacts/#{ARTIFACT_1}",
+    ]
+    assert_nofollow
+  end
+
+  describe "unzipped archive" do
+    before_each do
+      WebMock.stub(:get, "https://api.github.com/repos/username/reponame/actions/artifacts/#{ARTIFACT_5}/zip").to_return(
+        headers: HTTP::Headers{"location" => DOWNLOAD_TGZ})
+    end
+
+    test do
+      resp, body = serve("/UserName/RepoName/actions/artifacts/#{ARTIFACT_5}")
+      assert_canonical "https://nightly.link/UserName/RepoName/actions/artifacts/#{ARTIFACT_5}"
+      assert_contents [
+        "https://nightly.link/UserName/RepoName/actions/artifacts/#{ARTIFACT_5}/SomeArtifactT.tar.gz",
+        HTML.escape(DOWNLOAD_TGZ),
+      ]
+      assert !body.includes?("#{ARTIFACT_5}.zip")
+      assert_nofollow
+    end
+
+    test "redirect" do
+      resp, body = serve("/UserName/RepoName/actions/artifacts/#{ARTIFACT_5}/SomeArtifactT.tar.gz")
+      assert_redirect DOWNLOAD_TGZ
+    end
+
+    test "wrong file" do
+      resp, body = serve("/UserName/RepoName/actions/artifacts/#{ARTIFACT_5}/SomeArtifactT.tar")
+      assert resp.status == HTTP::Status::NOT_FOUND
+      assert_contents [
+        "has no file &#39;SomeArtifactT.tar&#39;",
+      ]
+    end
+
+    test "zip" do
+      resp, body = serve("/UserName/RepoName/actions/artifacts/#{ARTIFACT_5}.zip")
+      assert resp.status == HTTP::Status::NOT_FOUND
+      assert_contents [
+        "is not a zip archive", "Remove &#39;.zip&#39;",
+      ]
+    end
+  end
+end
+
+describe "ArtifactDownload" do
+  test "zip" do
+    download = ArtifactDownload.new(DOWNLOAD_1)
+    assert download.zip?
+    assert download.attachment?
+    assert download.filename == "foo.zip"
+  end
+
+  test "unzipped" do
+    download = ArtifactDownload.new(DOWNLOAD_EXE)
+    assert !download.zip?
+    assert download.attachment?
+    assert download.filename == "SomeArtifactE.exe"
+    assert download.content_type == "application/octet-stream"
+  end
+
+  test "displayed in browser" do
+    download = ArtifactDownload.new(DOWNLOAD_HTML)
+    assert !download.zip?
+    assert !download.attachment?
+    assert download.filename == "SomeArtifactH.html"
+  end
+
+  test "UTF-8 file name" do
+    download = ArtifactDownload.new("https://example.net/a?" + HTTP::Params.encode({
+      rscd: "attachment; filename*=UTF-8''%D1%82%D0%B5%D1%81%D1%82.tar.gz", rsct: "application/gzip",
+    }))
+    assert download.filename == "тест.tar.gz"
+  end
+
+  test "unknown format" do
+    download = ArtifactDownload.new("http://example.org/download1")
+    assert !download.zip?
+    assert !download.attachment?
+    assert download.filename.nil?
   end
 end
 

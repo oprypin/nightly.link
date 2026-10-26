@@ -454,6 +454,26 @@ class NightlyLink
     end
   end
 
+  # Unzipped artifacts that nightly.link links to directly, by file extension.  These are archives,
+  # so they are no more direct than the zip archives that all artifacts used to be.  Files that
+  # GitHub serves for display in the browser (web pages, images, etc.) are never linked to.
+  RAW_ARCHIVE_EXTENSIONS = {".7z", ".rar", ".tar", ".gz", ".tgz", ".xz", ".txz", ".bz2", ".tbz2", ".zst", ".tzst"}
+
+  private def raw_supported?(download : ArtifactDownload) : Bool
+    return false unless download.attachment? && (name = download.filename)
+    RAW_ARCHIVE_EXTENSIONS.any? { |ext| name.downcase.ends_with?(ext) }
+  end
+
+  # Unzipped artifacts are downloaded directly from the URL without a suffix, so their page needs `?preview`
+  private def page_url(url : String, download : ArtifactDownload, h : String?) : String
+    params = [("preview" unless download.zip?), ("h=#{h}" if h)].compact
+    params.empty? ? url : "#{url}?#{params.join('&')}"
+  end
+
+  private def direct_url(url : String, download : ArtifactDownload) : String
+    download.zip? ? url + ".zip" : url
+  end
+
   @[Retour::Get("/{repo_owner}/{repo_name}/workflows/{workflow}/{branch}/{artifact}{zip:\\.zip}")]
   @[Retour::Get("/{repo_owner}/{repo_name}/workflows/{workflow}/{branch}/{artifact}")]
   def by_branch(
@@ -461,6 +481,7 @@ class NightlyLink
     h : String? = nil, zip : String? = nil,
   )
     h = ctx.request.query_params["h"]? if ctx
+    preview = ctx.request.query_params["preview"]? if ctx
     token, h = RepoInstallation.verified_token(@db, repo_owner, repo_name, h: h)
     unless workflow.to_i64?(whitespace: false) || workflow.ends_with?(".yml") || workflow.ends_with?(".yaml")
       workflow += ".yml"
@@ -473,7 +494,7 @@ class NightlyLink
     run = get_latest_run(repo_owner, repo_name, workflow: workflow, branch: branch, status: status, token: token)
     repo_owner, repo_name = run.repository.owner, run.repository.name
 
-    links = by_run(nil, repo_owner, repo_name, run.id, artifact, run.check_suite_id, h, zip: zip)
+    links, download = by_run(nil, repo_owner, repo_name, run.id, artifact, run.check_suite_id, h, zip: zip, preview: preview)
     title = {"Repository #{repo_owner}/#{repo_name}", "Workflow #{workflow} | Branch #{branch} | Artifact #{artifact}"}
     links << ArtifactLink.new(
       github_actions_link(repo_owner, repo_name, event: run.event, branch: branch, status: status),
@@ -482,8 +503,8 @@ class NightlyLink
     canonical = abs_url(NightlyLink.gen_by_branch(
       repo_owner: repo_owner, repo_name: repo_name, workflow: workflow.rchop(".yml"), branch: branch, artifact: artifact
     ))
-    links << ArtifactLink.new(canonical + ".zip", h: h)
-    canonical += "?h=#{h}" if h
+    links << ArtifactLink.new(direct_url(canonical, download), h: h)
+    canonical = page_url(canonical, download, h)
 
     return links if ctx.nil?
     links.reverse!
@@ -497,11 +518,12 @@ class NightlyLink
   @[Retour::Get("/{repo_owner}/{repo_name}/actions/runs/{run_id:[0-9]+}/{artifact}")]
   def by_run(
     ctx, repo_owner : String, repo_name : String, run_id : Int64 | String, artifact : String, check_suite_id : Int64? | String = nil,
-    h : String? = nil, zip : String? = nil,
+    h : String? = nil, zip : String? = nil, preview : String? = nil,
   )
     run_id = run_id.to_i64 rescue raise HTTPException.new(:NotFound)
     check_suite_id = check_suite_id && check_suite_id.to_i64 rescue raise HTTPException.new(:NotFound)
     h = ctx.request.query_params["h"]? if ctx
+    preview = ctx.request.query_params["preview"]? if ctx
     token, h = RepoInstallation.verified_token(@db, repo_owner, repo_name, h: h)
 
     gh_link = github_run_link(repo_owner, repo_name, run_id)
@@ -520,7 +542,10 @@ class NightlyLink
     ) if !art
     repo_owner, repo_name = art.repository.owner, art.repository.name
 
-    links = by_artifact(nil, repo_owner, repo_name, art.id, check_suite_id, h, zip: zip)
+    # The link ends with the artifact's name, which is the file name for an unzipped artifact
+    links, download = by_artifact(
+      nil, repo_owner, repo_name, art.id, check_suite_id, h, zip: zip, file: (artifact unless preview)
+    )
     title = {"Repository #{repo_owner}/#{repo_name}", "Run ##{run_id} | Artifact #{artifact}"}
     links << ArtifactLink.new(
       github_run_link(repo_owner, repo_name, run_id), "View run ##{run_id}", ext: true
@@ -528,10 +553,10 @@ class NightlyLink
     canonical = abs_url(NightlyLink.gen_by_run(
       repo_owner: repo_owner, repo_name: repo_name, run_id: run_id, artifact: artifact
     ))
-    links << ArtifactLink.new(canonical + ".zip", h: h)
-    canonical += "?h=#{h}" if h
+    links << ArtifactLink.new(direct_url(canonical, download), h: h)
+    canonical = page_url(canonical, download, h)
 
-    return links if ctx.nil?
+    return {links, download} if ctx.nil?
     links.reverse!
     ctx.response.content_type = "text/html"
     ecr_body(ctx.response, title: title.join(" | "), canonical: canonical) do |io|
@@ -539,11 +564,21 @@ class NightlyLink
     end
   end
 
+  @[Retour::Get("/{repo_owner}/{repo_name}/actions/artifacts/{artifact_id:[0-9]+}/{file}")]
+  def by_artifact_file(ctx, repo_owner : String, repo_name : String, artifact_id : String, file : String)
+    # This only returns if it didn't redirect to the file
+    by_artifact(nil, repo_owner, repo_name, artifact_id, h: ctx.request.query_params["h"]?, file: file)
+    page_link = abs_url(NightlyLink.gen_by_artifact(repo_owner: repo_owner, repo_name: repo_name, artifact_id: artifact_id))
+    raise HTTPException.new(:NotFound,
+      "Artifact ##{artifact_id} has no file '#{file}'.\nSee the links for it: <#{page_link}>"
+    )
+  end
+
   @[Retour::Get("/{repo_owner}/{repo_name}/actions/artifacts/{artifact_id:[0-9]+}{zip:\\.zip}")]
   @[Retour::Get("/{repo_owner}/{repo_name}/actions/artifacts/{artifact_id:[0-9]+}")]
   def by_artifact(
     ctx, repo_owner : String, repo_name : String, artifact_id : String | Int64, check_suite_id : String | Int64? = nil,
-    h : String? = nil, zip : String? = nil,
+    h : String? = nil, zip : String? = nil, file : String? = nil,
   )
     artifact_id = artifact_id.to_i64 rescue raise HTTPException.new(:NotFound)
     if check_suite_id
@@ -556,8 +591,8 @@ class NightlyLink
       repo_owner: repo_owner, repo_name: repo_name, check_suite_id: check_suite_id, artifact_id: artifact_id
     ) if check_suite_id
     gh_link = artifact_gh_link || "https://api.github.com/repos/#{repo_owner}/#{repo_name}/actions/artifacts/#{artifact_id}"
-    tmp_link = begin
-      Artifact.zip_by_id(repo_owner, repo_name, artifact_id, token: token)
+    download = begin
+      ArtifactDownload.new(Artifact.zip_by_id(repo_owner, repo_name, artifact_id, token: token))
     rescue e : GitHubArtifactDownloadError
       raise HTTPException.new(:NotFound,
         "GitHub produced an error for the download of artifact ##{artifact_id}.\n" +
@@ -571,29 +606,39 @@ class NightlyLink
         )
       end
     end
-    if !tmp_link.partition("?")[0].ends_with?(".zip")
+    if !download.zip? && !raw_supported?(download)
       raise HTTPException.new(:NotFound,
-        "Sorry, only *.zip downloads are supported by nightly.link for the moment.\n" +
+        "Sorry, artifact ##{artifact_id} was uploaded without zipping it, " +
+        "and nightly.link supports that only for archives such as *.tar.gz or *.7z.\n" +
         "See <https://github.com/oprypin/nightly.link/issues/88>"
       )
     end
-    if zip
-      raise HTTPException.redirect(tmp_link)
+    if zip && !download.zip?
+      raise HTTPException.new(:NotFound,
+        "Artifact ##{artifact_id} is not a zip archive but a file '#{download.filename}'.\n" +
+        "Remove '.zip' from the link to get to it."
+      )
+    end
+    if zip || (file && file == download.filename)
+      raise HTTPException.redirect(download.url)
     end
 
     links = [] of ArtifactLink
     title = {"Repository #{repo_owner}/#{repo_name}", "Artifact ##{artifact_id}"}
-    links << ArtifactLink.new(tmp_link, "Ephemeral direct download link (expires in <1 minute)")
+    links << ArtifactLink.new(download.url, "Ephemeral direct download link (expires in <1 minute)")
     links << ArtifactLink.new(
       artifact_gh_link, "Direct download of artifact ##{artifact_id} (requires GitHub login)", ext: true
     ) if artifact_gh_link
     canonical = abs_url(NightlyLink.gen_by_artifact(
       repo_owner: repo_owner, repo_name: repo_name, artifact_id: artifact_id
     ))
-    links << ArtifactLink.new(canonical + ".zip", h: h)
+    direct = download.zip? ? canonical + ".zip" : abs_url(NightlyLink.gen_by_artifact_file(
+      repo_owner: repo_owner, repo_name: repo_name, artifact_id: artifact_id, file: download.filename.not_nil!
+    ))
+    links << ArtifactLink.new(direct, h: h)
     canonical += "?h=#{h}" if h
 
-    return links if ctx.nil?
+    return {links, download} if ctx.nil?
     links.reverse!
     ctx.response.content_type = "text/html"
     ecr_body(ctx.response, title: title.join(" | "), canonical: canonical) do |io|
